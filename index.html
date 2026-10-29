@@ -1,0 +1,1394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>openRCP Cook Log</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;500;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+</head>
+<body>
+<style>
+/* Layout: a phone frame centered on a quiet cream stage, prototype controls beside it on desktop and below it on phones. */
+:root{
+  --bg:#FFFEFA; --fg:#1F1A14; --muted:rgba(31,26,20,.6); --faint:rgba(31,26,20,.38);
+  --cream:#F4F0E7; --cream2:#EBE6D9; --line:rgba(31,26,20,.12);
+  --green:#01281A; --on-green:#FFFFFF; --green-soft:rgba(1,40,26,.08);
+  --stage:#EFEAE0; --frame:#1F1A14; --danger:#9B3B2E;
+  --display:'Kaisei Decol',Georgia,serif; --body:'Instrument Sans',system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#17150F; --fg:#F4F0E7; --muted:rgba(244,240,231,.62); --faint:rgba(244,240,231,.4);
+  --cream:#221F18; --cream2:#2B271E; --line:rgba(244,240,231,.14);
+  --green:#A7D8BC; --on-green:#0E1F16; --green-soft:rgba(167,216,188,.14);
+  --stage:#0F0E0B; --frame:#2B271E; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#17150F; --fg:#F4F0E7; --muted:rgba(244,240,231,.62); --faint:rgba(244,240,231,.4);
+  --cream:#221F18; --cream2:#2B271E; --line:rgba(244,240,231,.14);
+  --green:#A7D8BC; --on-green:#0E1F16; --green-soft:rgba(167,216,188,.14);
+  --stage:#0F0E0B; --frame:#2B271E; color-scheme:dark }
+
+html,body{height:100%}
+body{margin:0;background:var(--stage);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+input{font:inherit;color:inherit}
+h1,h2,h3{margin:0;font-weight:500;text-wrap:balance}
+
+.stage{min-height:100%;display:flex;gap:28px;align-items:flex-start;justify-content:center;padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));flex-wrap:wrap}
+.controls{width:280px;max-width:100%;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;order:2}
+.controls h2{font-family:var(--display);font-size:18px}
+.controls p{margin:0;color:var(--muted);font-size:13px}
+.controls .btn{width:100%}
+.controls .flows{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.controls .flows b{font-weight:600}
+.kbd{display:inline-block;border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:11px;color:var(--muted)}
+
+.phone{width:390px;max-width:100%;height:800px;background:var(--bg);border:10px solid var(--frame);border-radius:44px;overflow:hidden;position:relative;box-shadow:0 30px 60px rgba(0,0,0,.18);order:1;flex:none}
+@media (max-width:480px){
+  body{background:var(--bg)}
+  .stage{padding:0;gap:0;display:block}
+  .phone{width:100%;height:100dvh;border:0;border-radius:0;box-shadow:none}
+  .controls{border-radius:0;width:100%;border-left:0;border-right:0}
+}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column}
+.views{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;position:relative}
+.view{min-height:100%;display:flex;flex-direction:column}
+.pad{padding:0 18px}
+
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 10px;position:sticky;top:0;background:var(--bg);z-index:3}
+.hdr .brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:20px}
+.hdr .brand svg{width:26px;height:26px}
+.hdr .back{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:14px}
+.hdr .icon{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;position:relative}
+.hdr .icon:hover{background:var(--cream)}
+.badge{position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:var(--danger)}
+
+/* Tab bar */
+.tabbar{display:grid;grid-template-columns:1fr 1fr 64px 1fr 1fr;align-items:end;border-top:1px solid var(--line);background:var(--bg);padding:8px 8px calc(10px + env(safe-area-inset-bottom,0px))}
+.tabbar[hidden]{display:none}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--faint);padding:4px 0;border-radius:8px}
+.tab svg{width:22px;height:22px}
+.tab.on{color:var(--fg)}
+.tab.on svg{stroke-width:2.2}
+.plus{width:52px;height:52px;border-radius:50%;background:var(--green);color:var(--on-green);display:grid;place-items:center;justify-self:center;margin-bottom:6px;box-shadow:0 6px 16px rgba(1,40,26,.25)}
+.plus svg{width:24px;height:24px}
+
+/* Buttons and controls */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;padding:12px 16px;font-weight:600;font-size:15px;border:1px solid transparent;transition:transform .06s}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:var(--green);color:var(--on-green)}
+.btn.secondary{background:var(--cream);color:var(--fg)}
+.btn.ghost{border-color:var(--line);color:var(--fg)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:7px}
+.btn.wide{width:100%}
+.btn.on{background:var(--green-soft);color:var(--green);border-color:var(--green)}
+.seg{display:flex;background:var(--cream);border-radius:9px;padding:3px;gap:3px}
+.seg button{flex:1;padding:8px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--bg);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);font-size:13px;white-space:nowrap}
+.chip.on{background:var(--green);color:var(--on-green);border-color:var(--green)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 18px 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.search{display:flex;align-items:center;gap:10px;background:var(--cream);border-radius:10px;padding:10px 12px}
+.search svg{width:18px;height:18px;color:var(--muted);flex:none}
+.search input{flex:1;min-width:0;background:none;border:0;outline:0;font-size:15px}
+.search input::placeholder{color:var(--faint)}
+.field{background:var(--cream);border-radius:10px;padding:11px 13px;width:100%;border:0;font-size:15px}
+.field::placeholder{color:var(--faint)}
+.label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.eyebrow{font-size:12px;color:var(--muted)}
+.title-d{font-family:var(--display);font-size:22px;line-height:1.25}
+.h-sec{font-family:var(--display);font-size:18px;margin:0}
+.row-h{display:flex;align-items:baseline;justify-content:space-between;padding:18px 18px 10px}
+.row-h a,.row-h button.link{font-size:13px;color:var(--muted)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.tiny{font-size:12px}
+.stars{display:inline-flex;gap:2px;color:var(--green)}
+.stars svg{width:13px;height:13px}
+.stars.lg svg{width:30px;height:30px}
+.stars.lg{gap:6px}
+.stars .off{opacity:.22}
+.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;flex:none;font-family:var(--body)}
+.avatar.sm{width:26px;height:26px;font-size:10px}
+.avatar.lg{width:64px;height:64px;font-size:22px}
+.avstack{display:flex}
+.avstack .avatar{margin-left:-8px;border:2px solid var(--bg)}
+.avstack .avatar:first-child{margin-left:0}
+
+/* Food tiles: real source covers for catalog entries; gradient + glyph for cookbook entries (no thumbnail by design) */
+.tile{position:relative;border-radius:10px;overflow:hidden;background:var(--cream2);display:grid;place-items:center;aspect-ratio:1;max-width:100%}
+.tile img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.tile img.ph.user{transform:scale(var(--z,1.2));object-position:var(--pos,60% 45%)}
+.tile .noimg{width:26%;max-width:40px;color:var(--faint)}
+.tile .noimg svg{width:100%;height:100%}
+.tile.wide{aspect-ratio:4/3;border-radius:12px}
+.tile.wide .em{font-size:68px}
+.tile.sm{width:48px;height:48px;border-radius:8px;flex:none;aspect-ratio:auto}
+.tile.sm .em{font-size:22px}
+.tile.md{width:84px;height:84px;border-radius:10px;flex:none;aspect-ratio:auto}
+.tile.tr{width:66px;height:66px;border-radius:9px;flex:none;aspect-ratio:auto}
+.tile.md .em{font-size:34px}
+.tile.nophoto{filter:saturate(.45)}
+.tile.nophoto::after{content:"";position:absolute;inset:0;background:rgba(255,254,250,.35)}
+.tile .np{position:absolute;right:8px;bottom:8px;z-index:1;background:rgba(31,26,20,.55);color:#fff;font-size:10px;padding:3px 7px;border-radius:999px;display:flex;align-items:center;gap:4px}
+.tile .np svg{width:11px;height:11px}
+.tile .photo-tag{position:absolute;left:8px;bottom:8px;background:rgba(255,255,255,.85);color:#1F1A14;font-size:10px;font-weight:600;padding:3px 7px;border-radius:999px}
+.tile .cap{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 7px;font-size:11px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.55));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .corner{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.9);color:#1F1A14;font-size:10px;font-weight:700;padding:2px 6px;border-radius:999px;display:flex;align-items:center;gap:2px}
+.tile .corner svg{width:10px;height:10px}
+
+/* Feed card */
+.card{padding:14px 18px 10px;border-bottom:1px solid var(--line)}
+.card .who{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.card .who .t{font-size:12px;color:var(--muted);margin-left:auto}
+.card .who b{font-weight:600}
+.card .ttl{margin-top:10px;font-weight:600;font-size:16px}
+.card .src{font-size:13px;color:var(--muted);margin-top:2px}
+.card .note{margin-top:8px;font-style:italic;color:var(--fg)}
+.card .acts{display:flex;align-items:center;gap:14px;margin-top:10px}
+.card .acts button{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);padding:6px 4px}
+.card .acts button svg{width:19px;height:19px}
+.card .acts button.on{color:var(--green)}
+.card .acts .cnt{margin-left:auto;font-size:13px;color:var(--muted)}
+.card .acts .cnt b{color:var(--fg);font-weight:600}
+.card.lite{padding-top:12px}
+.card.lite .rrow:hover{background:none}
+.card.lite .acts{margin-top:8px;gap:10px}
+.card.lite .acts button{font-size:12px;padding:6px 2px;white-space:nowrap}
+.card.lite .acts .cnt{overflow:hidden;text-overflow:ellipsis;min-width:0}
+
+/* Lists */
+.list{display:flex;flex-direction:column}
+.rrow{display:flex;align-items:center;gap:12px;padding:10px 18px;text-align:left;width:100%}
+.rrow:hover{background:var(--cream)}
+.rrow .txt{flex:1;min-width:0}
+.rrow .txt b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rrow .txt span{display:block;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rrow .rank{width:22px;font-family:var(--display);font-size:18px;color:var(--muted);text-align:center;flex:none}
+.rrow .txt .sig{display:inline-block;margin-top:4px;font-size:11px;color:var(--green);background:var(--green-soft);padding:2px 7px;border-radius:999px;white-space:nowrap;line-height:1.3;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.rrow .meta{font-size:13px;color:var(--muted);flex:none}
+.rail{display:flex;gap:12px;overflow-x:auto;padding:4px 18px 12px;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.rail .item{width:110px;flex:none;text-align:left}
+.rail .item .tile{width:110px;height:110px;aspect-ratio:auto}
+.rail.week .item{width:78px}
+.rail.week .item .tile{width:78px;height:78px}
+.rail.week .item b{font-size:12px;-webkit-line-clamp:1}
+.rail.week .item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.multi{display:grid;gap:2px;place-items:stretch;background:var(--cream2)}
+.tile.multi.n2{grid-template-columns:1fr 1fr}
+.tile.multi.n3,.tile.multi.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.tile.multi img.ph{position:static;width:100%;height:100%;object-fit:cover;display:block;min-height:0}
+.tile.multi .more{display:grid;place-items:center;font-size:14px;font-weight:600;color:var(--muted)}
+.tile.emptyday{border:1.5px dashed var(--line);background:transparent;color:var(--faint);font-size:24px;display:grid;place-items:center}
+.rail .item b{display:block;font-size:13px;font-weight:600;margin-top:6px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rail .item span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:0 18px 18px}
+.grid3 button{display:block;text-align:left}
+.empty{padding:28px 18px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.empty h3{font-family:var(--display);font-size:20px}
+.empty p{margin:0;color:var(--muted);max-width:28ch}
+.callout{margin:12px 18px 6px;background:var(--cream);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.callout h3{font-family:var(--display);font-size:18px}
+.callout p{margin:0;color:var(--muted);font-size:14px}
+
+/* Recipe page */
+.hero{position:relative;background:var(--cream2);aspect-ratio:4/3;max-width:100%;display:grid;place-items:center;overflow:hidden}
+.hero .collage{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px}
+.hero .collage .tile{border-radius:0;aspect-ratio:auto}
+.hero .collage .tile .em{font-size:52px}
+.hero .solo{position:absolute;inset:0}
+.hero .solo .tile{border-radius:0;aspect-ratio:auto;height:100%}
+.hero .solo .tile .em{font-size:96px}
+.srcbadge{display:inline-flex;align-items:center;gap:6px;background:var(--cream);border-radius:999px;padding:5px 10px;font-size:12px;font-weight:600}
+.srcbadge.reader{background:var(--green-soft);color:var(--green)}
+.srcbadge svg{width:12px;height:12px}
+.friendrow{display:flex;gap:12px;padding:10px 18px;align-items:flex-start}
+.friendrow .txt{flex:1;min-width:0;font-size:14px}
+.friendrow .txt b{font-weight:600}
+.friendrow .txt .n{font-style:italic;color:var(--muted);display:block;margin-top:2px}
+.friendrow .txt .d{font-size:12px;color:var(--faint);display:block;margin-top:2px}
+.stat{display:flex;gap:18px;padding:6px 18px 0}
+.stat>* b{display:block;font-family:var(--display);font-size:22px;font-weight:500}
+.stat>* span{font-size:12px;color:var(--muted)}
+
+/* Sheets and overlays */
+.scrim{position:absolute;inset:0;background:rgba(31,26,20,.45);z-index:20;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet{background:var(--bg);border-radius:20px 20px 0 0;max-height:92%;display:flex;flex-direction:column;animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:.6}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){.sheet{animation:none}}
+.sheet .grab{width:36px;height:4px;border-radius:2px;background:var(--line);margin:10px auto 0}
+.sheethdr{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:8px 18px 2px;min-height:34px}
+.sheethdr b{font-weight:600;font-size:15px;text-align:center}
+.sheethdr .back{display:flex;align-items:center;gap:2px;color:var(--muted);font-size:14px;margin-left:-6px;justify-self:start}
+.sheethdr button:last-child{justify-self:end}
+.nudge{display:flex;align-items:center;gap:8px;padding:2px 18px 8px;font-size:13px;color:var(--muted)}
+.nudge .link{color:var(--green);font-weight:600;font-size:13px}
+.nudge .x{margin-left:auto;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--faint);font-size:12px}
+.nudge .x:hover{background:var(--cream)}
+.sheet .body{overflow-y:auto;padding:12px 18px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.sheet .rhead{display:flex;gap:12px;align-items:center}
+.sheet .rhead .txt b{display:block;font-weight:600;font-size:16px}
+.sheet .rhead .txt span{display:block;font-size:13px;color:var(--muted)}
+.sheet .rhead .txt i{display:block;font-size:12px;color:var(--green);font-style:normal;margin-top:2px}
+.phototile{height:110px;border-radius:12px;border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-weight:600;overflow:hidden;position:relative}
+.phototile svg{width:22px;height:22px}
+.phototile .tile{position:absolute;inset:0;border-radius:0;aspect-ratio:auto}
+.phototile .tile .em{font-size:56px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toast{position:absolute;left:18px;right:18px;bottom:96px;background:var(--fg);color:var(--bg);border-radius:12px;padding:12px 14px;z-index:30;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);animation:up .2s ease-out}
+.toast b{display:block;font-weight:600}
+.toast span{display:block;opacity:.8;font-size:13px}
+.push{position:absolute;left:12px;right:12px;top:14px;z-index:30;background:rgba(244,240,231,.96);color:#1F1A14;border-radius:16px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 10px 30px rgba(0,0,0,.25);animation:up .25s ease-out;text-align:left;width:auto}
+.push .ic{width:34px;height:34px;border-radius:8px;background:#01281A;color:#fff;display:grid;place-items:center;flex:none}
+.push .ic svg{width:20px;height:20px}
+.push b{display:block;font-size:13px}
+.push span{display:block;font-size:13px;color:rgba(31,26,20,.7)}
+.push small{position:absolute;right:14px;top:12px;font-size:11px;color:rgba(31,26,20,.5)}
+
+/* Onboarding */
+.ob{flex:1;display:flex;flex-direction:column;padding:0 22px calc(22px + env(safe-area-inset-bottom,0px));gap:16px}
+.ob .collage{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 -22px;padding:0 10px}
+.ob .collage .tile{border-radius:8px}
+.ob .collage .tile:nth-child(2){transform:translateY(18px)}
+.ob .collage .tile:nth-child(5){transform:translateY(18px)}
+.ob h1,.obwrap h1{font-family:var(--display);font-size:30px;line-height:1.2;font-weight:500}
+.obwrap h1{font-size:27px;margin-top:8px}
+.ob p,.obwrap p{margin:0;color:var(--muted);font-size:16px}
+.obwrap p{font-size:15px;margin:6px 0 14px}
+.ob .spacer,.obwrap .spacer{flex:1}
+.dots{display:flex;gap:6px;justify-content:center}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--fg)}
+/* Onboarding steps 2-4: header with Back, scrolling middle, CTA pinned in the viewport */
+.obwrap{position:absolute;inset:0;display:flex;flex-direction:column;padding:0 22px}
+.obhdr{display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;min-height:40px}
+.obhdr .back{display:flex;align-items:center;gap:2px;color:var(--muted);font-size:14px;margin-left:-6px}
+.obscroll{flex:1;min-height:0;overflow-y:auto;margin:0 -22px;padding:0 22px}
+.obfoot{display:flex;flex-direction:column;gap:8px;margin:0 -22px;padding:12px 22px calc(16px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
+.obfoot .skip{font-size:14px;color:var(--muted);padding:4px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+/* Radio chips (source picker) */
+.rchips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -22px;padding:2px 22px 4px}
+.rchips::-webkit-scrollbar{display:none}
+.rchip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px 7px 9px;border-radius:999px;border:1px solid var(--line);font-size:13px;white-space:nowrap;flex:none}
+.rchip i{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--faint);position:relative;flex:none}
+.rchip.on{border-color:var(--green);color:var(--green);background:var(--green-soft);font-weight:600}
+.rchip.on i{border-color:var(--green)}
+.rchip.on i::after{content:"";position:absolute;inset:2.5px;border-radius:50%;background:var(--green)}
+/* Multi-select rows */
+.rrow .chk{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;flex:none;color:transparent}
+.rrow .chk svg{width:14px;height:14px}
+.rrow.sel{background:var(--green-soft)}
+.rrow.sel .chk{background:var(--green);border-color:var(--green);color:var(--on-green)}
+/* Friends: method rows and invite link */
+a.method{color:inherit;text-decoration:none}
+.method,.invitecard{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.method .ic,.invitecard .ic{width:36px;height:36px;border-radius:10px;background:var(--cream);display:grid;place-items:center;flex:none}
+.method .ic svg,.invitecard .ic svg{width:18px;height:18px}
+.method .txt,.invitecard .txt{flex:1;min-width:0}
+.method .txt b,.invitecard .txt b{display:block;font-weight:600;font-size:14px}
+.method .txt span,.invitecard .txt span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.invitecard .txt .link{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.tag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;background:var(--cream);color:var(--muted);padding:2px 6px;border-radius:4px;font-weight:600}
+/* Feed card: open-at-source row, source mark, photo credit */
+.openlink{display:flex;align-items:center;gap:10px;margin-top:10px;padding:9px 12px;border-radius:10px;background:var(--cream);font-size:13px;width:100%;text-align:left;text-decoration:none;color:var(--fg)}
+.openlink b{font-weight:600}
+.openlink>svg{width:16px;height:16px;color:var(--muted);margin-left:auto;flex:none}
+.openlink.reader{background:var(--green-soft);color:var(--green)}
+.openlink.reader>svg{color:var(--green)}
+.openlink.primary{background:var(--green);color:var(--on-green);margin-top:4px;padding:11px 12px;font-size:14px}
+.openlink.primary>svg{color:var(--on-green)}
+.openlink.primary .srcmark{background:var(--on-green);color:var(--green)}
+.btn svg{width:18px;height:18px;flex:none}
+.stat button{text-align:left}
+.stat button:hover b{text-decoration:underline}
+.srcmark{width:26px;height:26px;border-radius:6px;background:var(--fg);color:var(--bg);font-size:9px;font-weight:700;display:grid;place-items:center;flex:none;letter-spacing:.02em}
+.srcmark.lg{width:34px;height:34px;border-radius:50%;font-size:11px}
+.tile .credit{position:absolute;left:8px;bottom:8px;background:rgba(31,26,20,.5);color:#fff;font-size:10px;padding:3px 7px;border-radius:999px}
+/* Simulated system sign-in sheet */
+.sys .syshead{text-align:center;padding:4px 0 2px}
+.sys .syshead b{display:block;font-size:17px;font-weight:600}
+.sys .syshead span{font-size:13px;color:var(--muted)}
+.acct{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);width:100%;text-align:left}
+.acct .txt{flex:1;min-width:0}
+.acct .txt b{display:block;font-weight:600}
+.acct .txt span{display:block;font-size:13px;color:var(--muted)}
+/* Invite message preview */
+.bubble{background:var(--cream);border-radius:16px 16px 16px 4px;padding:12px 14px;font-size:14px;max-width:90%}
+.linkcard{margin-top:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.linkcard .top{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.linkcard .top svg{width:28px;height:28px;flex:none}
+.linkcard b{display:block;font-size:13px;font-weight:600}
+.linkcard span{display:block;font-size:12px;color:var(--muted)}
+/* Share handoff demo: a stand-in source app, then an iOS-style share sheet */
+.demo{position:absolute;inset:0;background:#fff;color:#111;z-index:25;display:flex;flex-direction:column;font-family:-apple-system,system-ui,sans-serif}
+.demo .strip{font-size:11px;text-align:center;padding:6px;background:#f2f2f2;color:#666;letter-spacing:.04em;text-transform:uppercase}
+.demo .page{flex:1;overflow:hidden;padding:14px 18px}
+.demo .page h1{font-family:Georgia,serif;font-size:24px;line-height:1.15;margin:12px 0 6px;font-weight:700}
+.demo .page .by{font-size:13px;color:#555}
+.demo .page .ph{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;display:block}
+.demo .page .ad{background:#ececec;border:1px dashed #ccc;color:#999;font-size:11px;display:grid;place-items:center;border-radius:4px;height:60px;margin:12px 0}
+.demo .page .ln{height:10px;background:#eee;border-radius:5px;margin:8px 0}
+.demo .urlbar{background:#eee;border-radius:8px;padding:8px 12px;font-size:13px;color:#555;text-align:center;margin-bottom:10px}
+.demo .bar{display:flex;align-items:center;justify-content:space-around;padding:10px 0 calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid #e5e5e5;background:#f9f9f9;font-size:20px}
+.demo .bar button,.demo .bar span{width:40px;height:40px;display:grid;place-items:center;color:#1a73e8;border-radius:10px}
+.demo .bar svg,.demo .shrbtn svg{width:22px;height:22px}
+.demo .shrbtn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid #ccc;border-radius:8px;font-size:14px;font-weight:600;color:#111}
+.pulse{position:relative}
+.pulse::before{content:"";position:absolute;inset:-6px;border-radius:14px;border:2px solid #01281A;animation:pulse 1.2s ease-out infinite;pointer-events:none}
+@keyframes pulse{0%{transform:scale(.9);opacity:1}100%{transform:scale(1.25);opacity:0}}
+@media (prefers-reduced-motion: reduce){.pulse::before{animation:none}}
+.coach{position:absolute;left:14px;right:14px;bottom:18px;background:#1F1A14;color:#FFFEFA;border-radius:12px;padding:10px 12px;font-size:13px;display:flex;align-items:center;gap:10px;z-index:2;box-shadow:0 10px 30px rgba(0,0,0,.3);font-family:var(--body)}
+.coach b{font-weight:700;background:#FFFEFA;color:#1F1A14;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex:none}
+.coach button{margin-left:auto;color:rgba(255,254,250,.7);font-size:12px;flex:none}
+.coach.inl{position:static;margin:0}
+.ios{position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:26;display:flex;flex-direction:column;justify-content:flex-end}
+.ios .sh{background:#f2f2f7;border-radius:14px 14px 0 0;padding:12px 0 calc(72px + env(safe-area-inset-bottom,0px));color:#111;font-family:-apple-system,system-ui,sans-serif;animation:up .22s ease-out}
+.ios .prev{display:flex;align-items:center;gap:10px;padding:0 16px 12px;border-bottom:1px solid #ddd}
+.ios .prev img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none}
+.ios .prev b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ios .prev span{font-size:12px;color:#666}
+.ios .apps{display:flex;gap:12px;padding:14px 16px;overflow-x:auto;scrollbar-width:none}
+.ios .app{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:#333;flex:none;width:64px;text-align:center}
+.ios .app i{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;font-style:normal;font-size:22px;color:#fff}
+.ios .app.rcp i{background:#01281A}
+.ios .app.rcp i svg{width:28px;height:28px}
+.ios .acts{margin:0 16px;background:#fff;border-radius:12px}
+.ios .acts button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 14px;font-size:15px;border-bottom:1px solid #eee;text-align:left}
+.ios .acts button:last-child{border-bottom:0}
+.ios .acts button svg{width:18px;height:18px;color:#333}
+.ctlrow{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
+/* Sign-in buttons follow each platform's button guidelines (Apple: black/white, 44pt; Google: light with neutral border). In production the official
+   SDK buttons render the brand marks; the prototype leaves the mark slot empty rather than redrawing trademarked logos. */
+.auth{display:flex;flex-direction:column;gap:10px}
+.auth .btn{height:48px;font-weight:600;position:relative}
+.auth .logo-slot{width:18px;height:18px;flex:none;margin-right:2px}
+.btn.apple{background:#000;color:#fff;border-color:#000}
+.btn.google{background:#fff;color:#1f1f1f;border:1px solid #747775}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .btn.apple{background:#fff;color:#000;border-color:#fff} :root:not([data-theme="light"]) .btn.google{background:#131314;color:#e3e3e3;border-color:#8e918f} }
+:root[data-theme="dark"] .btn.apple{background:#fff;color:#000;border-color:#fff}
+:root[data-theme="dark"] .btn.google{background:#131314;color:#e3e3e3;border-color:#8e918f}
+/* Dietary chips */
+.dietgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 0 16px}
+.diet{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-size:14px;font-weight:500;text-align:left;background:var(--bg)}
+.diet .ic{width:34px;height:34px;border-radius:50%;background:var(--cream);display:grid;place-items:center;flex:none;color:var(--fg)}
+.diet .ic svg{width:19px;height:19px}
+.diet.on .ic{box-shadow:0 0 0 2px var(--green) inset}
+.diet.on{border-color:var(--green);background:var(--green-soft);color:var(--green);font-weight:600}
+/* Taste test deck */
+.deck{position:relative;height:338px;margin:6px 0 0}
+.tcard{position:absolute;left:0;right:0;top:0;background:var(--bg);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.14);overflow:hidden;touch-action:none;user-select:none;cursor:grab;border:1px solid var(--line)}
+.tcard:active{cursor:grabbing}
+.tcard .tile{border-radius:0}
+.tcard .tbody{padding:10px 14px 12px}
+.tcard .tbody b{display:block;font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard .tbody span{font-size:13px;color:var(--muted)}
+.tcard .stamp{position:absolute;top:16px;padding:6px 12px;border-radius:8px;font-weight:800;font-size:18px;letter-spacing:.04em;text-transform:uppercase;border:3px solid;transform:rotate(-12deg);pointer-events:none;background:rgba(255,254,250,.85)}
+.tcard .stamp.yes{left:16px;color:#1f7a4d;border-color:#1f7a4d;opacity:var(--yes,0)}
+.tcard .stamp.no{right:16px;color:var(--danger);border-color:var(--danger);transform:rotate(12deg);opacity:var(--no,0)}
+.tstack{position:relative;height:150px;width:100%;display:grid;place-items:center;margin:4px 0 10px}
+.tcard.mini{position:absolute;width:150px;left:calc(50% - 75px);top:4px;box-shadow:0 8px 20px rgba(0,0,0,.14);border-radius:12px}
+.tcard.mini .tile{aspect-ratio:1;border-radius:12px}
+.tbtns{display:flex;align-items:center;justify-content:center;gap:26px;padding:16px 0 6px}
+.tbtn{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:700;border:1.5px solid var(--line);background:var(--bg);box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.tbtn svg{width:26px;height:26px}
+.tbtn.no{color:var(--danger)}
+.tbtn.yes{color:var(--on-green);background:var(--green);border-color:var(--green)}
+/* Date picker on the Made it sheet */
+.daypick{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.daypick .chip{padding:6px 10px;font-size:12px}
+.daypick input[type=date]{border:0;background:none;font:inherit;color:inherit;font-size:12px;width:118px;padding:0}
+.daypick input[type=date]::-webkit-calendar-picker-indicator{opacity:.55}
+.frow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.frow .txt{flex:1;min-width:0}
+.frow .txt b{display:block;font-weight:600}
+.frow .txt span{display:block;font-size:13px;color:var(--muted)}
+
+/* Reader */
+.reader{padding:0 18px 24px;max-width:100%}
+.reader h1{font-family:var(--display);font-size:26px;line-height:1.2;margin:8px 0 6px}
+.reader .asseen{display:flex;align-items:center;justify-content:space-between;background:var(--cream);border-radius:10px;padding:10px 12px;font-size:13px;margin:10px 0 16px}
+.reader .asseen a{color:var(--green);font-weight:600;text-decoration:none}
+.reader h2{font-family:var(--display);font-size:18px;margin:18px 0 8px}
+.reader ul,.reader ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.reader li{padding-left:4px}
+.reader .meta{display:flex;gap:16px;font-size:13px;color:var(--muted)}
+.stepchk{display:flex;gap:10px;align-items:flex-start}
+.stepchk input{margin-top:4px}
+.sep{height:1px;background:var(--line);margin:14px 18px}
+.notif{display:flex;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line);align-items:flex-start;text-align:left;width:100%}
+.notif .txt{flex:1;font-size:14px}
+.notif .txt b{font-weight:600}
+.notif .txt span{display:block;font-size:12px;color:var(--faint);margin-top:2px}
+.protonote{font-size:12px;color:var(--faint);padding:0 18px 12px}
+</style>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <div class="screen">
+      <div class="views" id="views"></div>
+      <nav class="tabbar" id="tabbar" hidden>
+        <button class="tab" data-tab="feed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>Feed</button>
+        <button class="tab" data-tab="explore"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</button>
+        <button class="plus" id="plusBtn" aria-label="Log a cook"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="tab" data-tab="diary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h16v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z"/><path d="M2 10h20M8 10V7a4 4 0 0 1 8 0v3"/></svg>My Kitchen</button>
+        <button class="tab" data-tab="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>More</button>
+      </nav>
+    </div>
+    <div id="overlay"></div>
+  </div>
+
+  <aside class="controls">
+    <h2>Prototype controls</h2>
+    <p>openRCP design language, seeded with 24 recipes and 6 friends. Every tile is the source's real photo; cookbook entries use the publisher's online version of the recipe. Nothing here is saved.</p>
+    <button class="btn secondary" id="ctlShareNyt">Share from NYT Cooking</button>
+    <button class="btn secondary" id="ctlShareBlog">Share a blog link</button>
+    <button class="btn secondary" id="ctlDigest">Send Sunday digest push</button>
+    <button class="btn ghost" id="ctlOnboard">Restart from onboarding</button>
+    <button class="btn ghost" id="ctlReset">Reset data</button>
+    <label class="ctlrow"><input type="checkbox" id="ctlSynth"> Seed feed with 20 synthetic cooks</label>
+    <div class="flows">
+      <span class="label">Flows to try</span>
+      <div><b>A</b> Restart → sign in → what you eat → friends → tick what you cooked → My Kitchen</div>
+      <div><b>H</b> Feed → "Tune your feed" card (3rd slot) → swipe 8 → Trending re-ranks</div>
+      <div><b>G</b> My Kitchen → Planning to cook → tap a day → tick up to 4 → Made it clears one</div>
+      <div><b>B</b> Share from NYT → share sheet → openRCP → Log it → Feed</div>
+      <div><b>C</b> + → Paste a link → matched → I made it</div>
+      <div><b>I</b> Feed → "Jake is making this Monday" → tap Jake → his kitchen and plan</div>
+      <div><b>D</b> Feed → blog recipe → Open in reader</div>
+      <div><b>E</b> Cold start: Restart, skip friends and log → Feed, then tick synthetic</div>
+      <div><b>F</b> Search → Appetizer → pick a signal → keep scrolling</div>
+    </div>
+    <div class="flows">
+      <span class="label">Discovery signals</span>
+      <div>Feed and Search never dead-end: after friends comes a trending stream ranked by cooks and tagged with where it is moving (NYT trending, TikTok, Instagram, friends of friends, openRCP). Signals are simulated here; in the product they come from source pages, social listening and openRCP's own log velocity.</div>
+    </div>
+    <div class="flows">
+      <span class="label">How sharing works</span>
+      <div>The share sheet is the barcode scanner. openRCP ships a share extension (iOS) and share target (Android), so it appears in the share sheet of NYT Cooking, Safari, Chrome and Instagram. It receives only a URL, reads the page's public title, author and photo, matches the catalog and opens the Made it sheet. Paste a link is the same path by hand.</div>
+    </div>
+  </aside>
+</div>
+
+<script>
+/* ---------- Seed data ---------- */
+const SOURCES = {
+  nyt:{name:'NYT Cooking',type:'subscription',url:'https://cooking.nytimes.com'},
+  sk:{name:'Smitten Kitchen',type:'blog',url:'https://smittenkitchen.com'},
+  se:{name:'Serious Eats',type:'blog',url:'https://www.seriouseats.com'},
+  hbh:{name:'Half Baked Harvest',type:'blog',url:'https://www.halfbakedharvest.com'},
+  bb:{name:'Budget Bytes',type:'blog',url:'https://www.budgetbytes.com'},
+  ba:{name:'Bon Appétit',type:'blog',url:'https://www.bonappetit.com'},
+  tmd:{name:'The Mediterranean Dish',type:'blog',url:'https://www.themediterraneandish.com'},
+  sbk:{name:'Your recipes',type:'own'},
+  sfah:{name:'Salt Fat Acid Heat',type:'cookbook'},
+  fl:{name:'The Food Lab',type:'cookbook'},
+  ott:{name:'Ottolenghi Simple',type:'cookbook'},
+  jer:{name:'Jerusalem',type:'cookbook'}
+};
+const RECIPES = [
+  {id:'r1',t:'Shrimp Scampi With Orzo',a:'Ali Slagle',s:'nyt',m:25,em:'🍤',h:18,net:412,avg:4.6},
+  {id:'r2',t:'Caramelized Shallot Pasta',a:'Alison Roman',s:'nyt',m:40,em:'🍝',h:32,net:388,avg:4.7},
+  {id:'r3',t:'Roasted Chicken Provençal',a:'Sam Sifton',s:'nyt',m:70,em:'🍗',h:40,net:301,avg:4.8},
+  {id:'r4',t:'Salmon With Anchovy-Garlic Butter',a:'Melissa Clark',s:'nyt',m:20,em:'🐟',h:200,net:156,avg:4.5},
+  {id:'r5',t:'One-Pot Pasta With Ricotta and Lemon',a:'Ali Slagle',s:'nyt',m:20,em:'🍋',h:54,net:244,avg:4.4},
+  {id:'r6',t:'Crispy Gnocchi With Burst Tomatoes and Mozzarella',a:'Ali Slagle',s:'nyt',m:25,em:'🍅',h:8,net:367,avg:4.7},
+  {id:'r7',t:'Chicken Tikka Masala',a:'Sam Sifton',s:'nyt',m:60,em:'🍛',h:24,net:289,avg:4.6},
+  {id:'r8',t:'Spicy, Garlicky Cashew Chicken',a:'Kay Chun',s:'nyt',m:30,em:'🥜',h:36,net:98,avg:4.3},
+  {id:'r9',t:'Skillet Chicken With Mushrooms and Caramelized Onions',a:'Melissa Clark',s:'nyt',m:45,em:'🍄',h:28,net:122,avg:4.5},
+  {id:'r10',t:'Lemony Pasta With Chickpeas and Parsley',a:'Melissa Clark',s:'nyt',m:25,em:'🥣',h:62,net:77,avg:4.2},
+  {id:'r11',t:'Sheet-Pan Chicken With Chickpeas, Cumin and Turmeric',a:'Yasmin Fahr',s:'nyt',m:45,em:'🥘',h:44,net:134,avg:4.4},
+  {id:'r12',t:'Miso-Honey Chicken and Asparagus',a:'Kay Chun',s:'nyt',m:30,em:'🍯',h:48,net:61,avg:4.3},
+  {id:'r13',t:'Mushroom Bourguignon',a:'Deb Perelman',s:'sk',m:60,em:'🍷',h:350,net:143,avg:4.7,reader:true},
+  {id:'r14',t:'Sheet Pan Chicken Tikka',a:'Deb Perelman',s:'sk',m:50,em:'🫓',h:20,net:88,avg:4.5,reader:true},
+  {id:'r15',t:'Halal Cart-Style Chicken and Rice',a:'J. Kenji López-Alt',s:'se',m:50,em:'🍚',h:46,net:210,avg:4.8,reader:true},
+  {id:'r16',t:'Crispy Smashed Potatoes',a:'J. Kenji López-Alt',s:'se',m:45,em:'🥔',h:42,net:97,avg:4.6,reader:true},
+  {id:'r17',t:'Saucy Coconut Curry Chicken',a:'Tieghan Gerard',s:'hbh',m:45,em:'🍛',h:38,net:72,avg:4.4,reader:true},
+  {id:'r18',t:'15-Minute Spicy Sriracha Noodles',a:'Beth Moncel',s:'bb',m:15,em:'🌶️',h:4,net:181,avg:4.3,reader:true},
+  {id:'r19',t:'Pasta al Limone',a:'Bon Appétit Test Kitchen',s:'ba',m:15,em:'🍋',h:56,net:119,avg:4.5,reader:true},
+  {id:'r20',t:'Greek Chicken and Potatoes',a:'Suzy Karadsheh',s:'tmd',m:75,em:'🍋',h:52,net:64,avg:4.5,reader:true},
+  {id:'r21',t:'Buttermilk-Marinated Roast Chicken',a:'Samin Nosrat',s:'sfah',m:90,em:'🍗',h:34,net:203,avg:4.9,page:340},
+  {id:'r22',t:'Foolproof Pan Pizza',a:'J. Kenji López-Alt',s:'fl',m:120,em:'🍕',h:12,net:166,avg:4.7,page:770},
+  {id:'r23',t:'Roasted Eggplant With Curried Yogurt',a:'Yotam Ottolenghi',s:'ott',m:40,em:'🍆',h:280,net:54,avg:4.4,page:146},
+  {id:'r24',t:'Roasted Chicken With Clementines',a:'Ottolenghi & Tamimi',s:'jer',m:75,em:'🍊',h:26,net:88,avg:4.6,page:179},
+];
+const USERS = [
+  {id:'me',n:'Ben',h:'@ben',c:'#01281A',bio:'Weeknight cook. NYT loyalist.'},
+  {id:'sam',n:'Sam Okafor',h:'@samcooks',c:'#7A4A2B',bio:'Sheet pans and lemons.'},
+  {id:'priya',n:'Priya Raman',h:'@priya.r',c:'#2D5A47',bio:'Pasta on Sundays.'},
+  {id:'jake',n:'Jake Lindqvist',h:'@jlind',c:'#4A5A7A',bio:'Grill in all weather.'},
+  {id:'maya',n:'Maya Chen',h:'@mayacooks',c:'#8A5A2B',bio:'Cookbook collector.'},
+  {id:'tom',n:'Tom Alvarez',h:'@tomal',c:'#5A3A6A',bio:'Dad of three, 30 minutes max.'},
+  {id:'dani',n:'Dani Rosen',h:'@danirosen',c:'#2B6A7A',bio:'Testing every Kenji recipe.'},
+];
+// Concept keywords for discovery search ("appetizer", "weeknight", "sheet pan"...)
+const KEYWORDS={r1:['pasta','seafood','shrimp','weeknight','one pot'],r2:['pasta','vegetarian','weeknight'],r3:['chicken','sunday project','roast'],r4:['seafood','fish','weeknight','quick'],r5:['pasta','vegetarian','one pot','quick','weeknight'],r6:['pasta','vegetarian','sheet pan','weeknight'],r7:['chicken','curry','indian'],r8:['chicken','stir fry','weeknight','quick'],r9:['chicken','weeknight','skillet'],r10:['pasta','vegetarian','pantry','quick'],r11:['chicken','sheet pan','weeknight'],r12:['chicken','sheet pan','quick','weeknight'],r13:['vegetarian','sunday project','stew'],r14:['chicken','sheet pan','indian'],r15:['chicken','rice','street food'],r16:['side','appetizer','potatoes','vegetarian','party'],r17:['chicken','curry','weeknight'],r18:['noodles','quick','vegetarian','budget','weeknight'],r19:['pasta','vegetarian','quick'],r20:['chicken','potatoes','sheet pan','sunday project','greek'],r21:['chicken','sunday project','roast'],r22:['pizza','sunday project','vegetarian'],r23:['vegetarian','appetizer','side','party'],r24:['chicken','sunday project','roast']};
+const MARKS={nyt:'NYT',sk:'SK',se:'SE',hbh:'HBH',bb:'BB',ba:'BA',tmd:'TMD',sbk:'YOU',sfah:'SFAH',fl:'FL',ott:'OS',jer:'JER'};
+// Discovery signals: where a recipe is trending right now. Deterministic per recipe for the prototype.
+const SIGNALS=[{id:'nyt',l:'Trending on NYT Cooking',short:'NYT trending'},{id:'tiktok',l:'Buzzing on TikTok',short:'TikTok'},{id:'ig',l:'Up on Instagram this week',short:'Instagram'},{id:'fof',l:'Rising with friends of friends',short:'Friends of friends'},{id:'rcp',l:'Most cooked on openRCP',short:'openRCP'}];
+// Contacts who are not on openRCP yet (invite path)
+const CONTACTS = [{id:'alex',n:'Alex Rivera'},{id:'jordan',n:'Jordan Lee'},{id:'chris',n:'Chris Patel'}];
+// Synthetic community accounts for the cold-start experiment (generic names, random recipes on a cadence)
+const SYNTH_NAMES = ['Alex Morgan','Jordan Lee','Taylor Brooks','Casey Nguyen','Riley Cohen','Morgan Diaz','Jamie Park','Avery Singh','Quinn Walsh','Drew Kim','Reese Patel','Skyler Ortiz','Parker Hayes','Rowan Fischer','Emerson Cole','Sage Murphy','Harper Lin','Blake Rivera','Finley Ross','Dakota Bell'];
+const DAY = 864e5;
+const now = Date.now();
+const d = (daysAgo,hour=18)=>{const x=new Date(now-daysAgo*DAY);x.setHours(hour,Math.floor(Math.random()*50),0,0);return x.getTime();};
+const seedCooks = () => [
+  {u:'sam',r:'r1',t:d(0,12),p:true,rt:5,n:'Doubled the garlic, used stock not water'},
+  {u:'priya',r:'r2',t:d(0,9),p:true,rt:5,n:'Took the full 40 minutes on the shallots. Worth it.'},
+  {u:'tom',r:'r18',t:d(1),p:false,rt:4,n:'Kids ate it. Halved the sriracha.'},
+  {u:'maya',r:'r21',t:d(1,19),p:true,rt:5,n:'24 hour marinade. Best roast chicken I have made.'},
+  {u:'jake',r:'r15',t:d(2),p:true,rt:5,n:''},
+  {u:'dani',r:'r16',t:d(2,19),p:true,rt:4,n:'Smash harder than you think'},
+  {u:'sam',r:'r6',t:d(3),p:false,rt:4,n:''},
+  {u:'priya',r:'r19',t:d(3,19),p:true,rt:4,n:'More lemon zest next time'},
+  {u:'maya',r:'r23',t:d(4),p:true,rt:4,n:''},
+  {u:'tom',r:'r5',t:d(4,18),p:false,rt:3,n:'Fine. Bland without the extra parm.'},
+  {u:'jake',r:'r3',t:d(5),p:true,rt:5,n:'Sunday staple'},
+  {u:'dani',r:'r22',t:d(5,19),p:true,rt:5,n:'72 hour cold ferment'},
+  {u:'sam',r:'r13',t:d(6),p:true,rt:5,n:'Served over polenta'},
+  {u:'priya',r:'r1',t:d(7),p:false,rt:4,n:''},
+  {u:'maya',r:'r24',t:d(8),p:true,rt:5,n:'Used arak. Do not skip it.'},
+  {u:'tom',r:'r12',t:d(8,18),p:false,rt:4,n:''},
+  {u:'jake',r:'r7',t:d(9),p:true,rt:4,n:'Doubled the sauce'},
+  {u:'dani',r:'r15',t:d(10),p:true,rt:5,n:'Second time this month'},
+  {u:'sam',r:'r4',t:d(11),p:true,rt:4,n:''},
+  {u:'priya',r:'r10',t:d(12),p:false,rt:4,n:'Pantry dinner'},
+  {u:'me',r:'r1',t:d(2,19),p:true,rt:5,n:'Used chicken stock. Third time.'},
+  {u:'me',r:'r1',t:d(16),p:false,rt:4,n:''},
+  {u:'me',r:'r1',t:d(30),p:true,rt:4,n:'First try'},
+  {u:'me',r:'r6',t:d(4,19),p:true,rt:4,n:'Pan was too crowded, use two'},
+  {u:'me',r:'r9',t:d(7),p:true,rt:5,n:'Onions took 25 min. Plan for it.'},
+  {u:'me',r:'r3',t:d(9),p:true,rt:5,n:''},
+  {u:'me',r:'r18',t:d(12),p:false,rt:3,n:''},
+  {u:'me',r:'r20',t:d(14),p:true,rt:4,n:'Potatoes first, 15 min head start'},
+].map((c,i)=>({id:'c'+i,...c,vis:'friends'}));
+
+// Friends' saves and plans: the other two social events in the feed besides "made".
+const seedFriendWants = () => ({ sam:[{r:'r19',t:d(0,15)},{r:'r23',t:d(5,12)}], priya:[{r:'r16',t:d(1,11)}], jake:[{r:'r22',t:d(2,8)}], maya:[{r:'r1',t:d(0,8)}], tom:[{r:'r18',t:d(3,13)}], dani:[{r:'r13',t:d(1,20)}] });
+const seedFriendPlans = () => ({ sam:[{r:'r3',key:isoDate(now+DAY),t:d(0,10)},{r:'r7',key:isoDate(now+4*DAY),t:d(1,9)}], priya:[{r:'r2',key:isoDate(now+2*DAY),t:d(0,13)},{r:'r19',key:isoDate(now+2*DAY),t:d(0,13)}], jake:[{r:'r15',key:isoDate(now+DAY),t:d(1,18)}], tom:[{r:'r18',key:isoDate(now+3*DAY),t:d(2,12)}], dani:[{r:'r22',key:isoDate(now+5*DAY),t:d(0,21)}] });
+let S;
+function freshState(onboarded){
+  S = {onboarded, following: onboarded?['sam','priya','jake','maya','tom','dani']:[], cooks:seedCooks(), wants: onboarded?['r2','r13','r21','r17','r19']:[], likes:[], notifs:[], me:{n:'Ben',h:'@ben'}, lastVis:'friends', stack:[], tab:'feed', diaryTab:'cooks', invited:[], synth:false, obPicked:[], obSrc:'all', obQ:'', logSrc:'all', obContacts:false, diet:[], taste:[], tasteIdx:0, fwants:seedFriendWants(), fplan:seedFriendPlans(), userTab:'cooks', plan: onboarded?{[isoDate(now+DAY)]:['r2','r19'],[isoDate(now+3*DAY)]:['r13','r16','r3']}:{}};
+  if(onboarded){ S.notifs=[{t:d(1,10),txt:'<b>Sam made Shrimp Scampi With Orzo</b>, which is on your want list',r:'r1'},{t:d(2,17),txt:'<b>Priya liked your cook</b> of Crispy Gnocchi',r:'r6'}]; }
+}
+RECIPES.forEach(r=>r.k=KEYWORDS[r.id]||[]);
+Object.entries(MARKS).forEach(([k,m])=>SOURCES[k].mark=m);
+const R = id => RECIPES.find(r=>r.id===id);
+const sigOf = r => (r.s==='nyt'&&r.h%2===0) ? SIGNALS[0] : SIGNALS[1+(r.h%4)];
+const U = id => USERS.find(u=>u.id===id);
+const SRC = r => SOURCES[r.s];
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ago = t => {const h=Math.round((now-t)/36e5); if(h<1) return 'now'; if(h<24) return h+'h'; const dd=Math.round(h/24); return dd===1?'1d':dd+'d';};
+const dateStr = t => new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+const mins = m => m>=60 ? (m%60? Math.floor(m/60)+'h '+(m%60)+'m' : Math.floor(m/60)+'h') : m+' min';
+const srcLine = r => { const s=SRC(r); return s.type==='cookbook' ? `${esc(r.a)} · ${esc(s.name)} p.${r.page}` : s.type==='own' ? `Added by you` : `${esc(r.a)} · ${esc(s.name)} · ${mins(r.m)}`; };
+const myCooks = r => S.cooks.filter(c=>c.u==='me'&&(!r||c.r===r));
+const friendCooks = r => S.cooks.filter(c=>c.u!=='me'&&S.following.includes(c.u)&&(!r||c.r===r));
+const netCount = r => R(r).net + S.cooks.filter(c=>c.r===r).length;
+
+/* ---------- Small components ---------- */
+const ICON = {
+  heart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+  heartOn:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+  bm:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 4h12v17l-6-4-6 4z"/></svg>',
+  bmOn:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h12v17l-6-4-6 4z"/></svg>',
+  star:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="m12 2.5 2.9 6.2 6.6.8-4.9 4.6 1.3 6.6L12 17.4l-5.9 3.3 1.3-6.6L2.5 9.5l6.6-.8z"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  camOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><path d="m3 3 18 18"/></svg>',
+  bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+  back:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>',
+  ext:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 5h5v5M19 5l-8 8M18 14v5H5V6h5"/></svg>',
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3z"/><path d="M5 4v16"/></svg>',
+  link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
+  logo:'<svg viewBox="0 0 37 36" fill="none"><path stroke="currentColor" stroke-miterlimit="10" stroke-width="1.5" d="M32.721 1H4.28C2.468 1 1 2.038 1 3.32v29.36C1 33.963 2.468 35 4.279 35H32.72c1.812 0 3.28-1.038 3.28-2.32V3.32C36 2.037 34.532 1 32.721 1Z"/><path stroke="currentColor" stroke-miterlimit="10" stroke-width="1.3" d="m15.218 16.716 5.83-.366a5.03 5.03 0 0 0 4.718-5.02v-1.304A4.96 4.96 0 0 0 20.81 5.07H15v23.728"/><path stroke="currentColor" stroke-miterlimit="10" stroke-width="1.3" d="M18.513 16.498c1.56 0 3.55-.456 5.065 2.343 2.286 4.211 4.128 14.54 9.27 11.607"/><path fill="currentColor" d="M17.954 5h-2.856v23.965h2.856z"/><path stroke="currentColor" stroke-miterlimit="10" stroke-width="1.3" d="M10.284 20.564a4.282 4.282 0 1 0 0-8.564 4.282 4.282 0 0 0 0 8.564Z"/><path fill="currentColor" d="M8.833 12.424v7.748s-2.915-1.508-2.831-3.89c.102-2.998 2.83-3.858 2.83-3.858"/></svg>'
+};
+ICON.mail='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
+ICON.cal='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>';
+const sameDay = (a,b) => new Date(a).toDateString()===new Date(b).toDateString();
+const isoDate = t => { const d=new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const dayLabel = t => { const d0=new Date(now); d0.setHours(0,0,0,0); const d=new Date(t); d.setHours(0,0,0,0); const off=Math.round((d0-d)/DAY); if(off===0) return 'Today'; if(off===1) return 'Yesterday'; if(off>1&&off<7) return new Date(t).toLocaleDateString(undefined,{weekday:'long'}); if(off===-1) return 'Tomorrow'; if(off<0&&off>-7) return new Date(t).toLocaleDateString(undefined,{weekday:'long'}); return dateStr(t); };
+// Planning to cook: the next 7 days, one recipe per day at most. Deliberately not a meal planner.
+const weekDays = () => [...Array(7)].map((_,i)=>{ const t=now+i*DAY; return {key:isoDate(t),t,label:i===0?'Today':i===1?'Tomorrow':new Date(t).toLocaleDateString(undefined,{weekday:'short'}),date:new Date(t).getDate()}; });
+const PLAN_MAX=4;
+const planOf = key => S.plan[key]||[];
+const plannedFor = rid => Object.entries(S.plan||{}).find(([k,v])=>v.includes(rid));
+const planRemove = rid => Object.keys(S.plan).forEach(k=>{ S.plan[k]=S.plan[k].filter(x=>x!==rid); if(!S.plan[k].length) delete S.plan[k]; });
+// A day tile: one photo, or a 2-up / 2x2 collage for up to four recipes.
+function dayTile(rids,cls='tr'){ if(rids.length===1) return tile(R(rids[0]),{cls}); const n=Math.min(rids.length,4); return `<span class="tile ${cls} multi n${n}">${rids.slice(0,4).map(id=>`<img class="ph" src="${cover(R(id))}" alt="" loading="lazy">`).join('')}${n===3?'<span class="more">+</span>':''}</span>`; }
+ICON.share='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 11v9h14v-9"/></svg>';
+ICON.contacts='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c.8-3.5 3.2-5.5 6-5.5s5.2 2 6 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c1.8.6 3 2.2 3.5 5.5"/></svg>';
+ICON.chev='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--faint);flex:none"><path d="m10 6 6 6-6 6"/></svg>';
+// Every catalog entry carries the source's own cover. Cookbook entries use the publisher's online version of the same recipe
+// (NYT Cooking, Serious Eats, ottolenghi.co.uk). Only entries the user typed in by hand (u… ids) have no photo yet.
+const cover = r => /^r\d+$/.test(r.id) ? `photos/${r.id}.jpg` : null;
+// A cook's own photo is simulated by a tighter, offset crop of the cover (v picks the crop).
+const CROPS = ['--z:1.22;--pos:62% 42%','--z:1.35;--pos:30% 60%','--z:1.18;--pos:75% 30%','--z:1.4;--pos:45% 70%'];
+// photo: true = the cook's own photo (simulated crop + "Sam's photo" tag); false/null = the source cover, credited when credit:true.
+function tile(r,{cls='',photo=null,cap=null,corner=null,who=null,v=0,credit=false}={}){
+  const src = cover(r);
+  const pic = src
+    ? `<img class="ph ${photo?'user':''}" src="${src}" alt="" loading="lazy" style="${photo?CROPS[v%CROPS.length]:''}">`
+    : `<span class="noimg" aria-hidden="true">${ICON.cam}</span>`;
+  return `<div class="tile ${cls}">${pic}${photo&&who?`<span class="photo-tag">${esc(who)}'s photo</span>`:''}${!photo&&credit&&src?`<span class="credit">Photo: ${esc(SRC(r).name)}</span>`:''}${cap?`<span class="cap">${esc(cap)}</span>`:''}${corner?`<span class="corner">${ICON.star}${corner}</span>`:''}</div>`;
+}
+const avatar = (u,cls='') => `<span class="avatar ${cls}" style="background:${u.c}">${esc(u.n.split(' ').map(x=>x[0]).join('').slice(0,2))}</span>`;
+const stars = (n,cls='') => n ? `<span class="stars ${cls}" aria-label="${n} of 5 stars">${[1,2,3,4,5].map(i=>`<span class="${i<=n?'':'off'}">${ICON.star}</span>`).join('')}</span>` : '';
+const hdr = (left,right='') => `<div class="hdr">${left}<div style="display:flex;gap:4px">${right}</div></div>`;
+const brandHdr = () => hdr(`<div class="brand"><span style="color:var(--fg)">${ICON.logo}</span>openRCP</div>`, `<button class="icon" data-go="notifs" aria-label="Notifications">${ICON.bell}${S.notifs.some(n=>!n.read)?'<span class="badge"></span>':''}</button>`);
+const backHdr = (title='',right='') => hdr(`<button class="back" data-back>${ICON.back}${esc(title)}</button>`, right);
+
+/* ---------- Views ---------- */
+const views = {};
+// One feed: friends' cooks first, then an unbounded trending stream with the same scroll mechanics. No modes.
+function friendEvents(){
+  const ev = friendCooks().map(c=>({type:'cook',t:c.t,u:c.u,c}));
+  Object.entries(S.fwants||{}).forEach(([u,arr])=>{ if(S.following.includes(u)) arr.forEach(w=>ev.push({type:'save',t:w.t,u,r:w.r})); });
+  Object.entries(S.fplan||{}).forEach(([u,arr])=>{ if(S.following.includes(u)) arr.forEach(pl=>ev.push({type:'plan',t:pl.t,u,r:pl.r,key:pl.key})); });
+  return ev.sort((a,b)=>b.t-a.t);
+}
+const friendsPlanning = rid => Object.entries(S.fplan||{}).flatMap(([u,arr])=>arr.filter(pl=>pl.r===rid&&S.following.includes(u)).map(pl=>({u,key:pl.key})));
+views.feed = () => {
+  const cooks = friendCooks().sort((a,b)=>b.t-a.t);
+  const real = S.following.filter(id=>!(U(id)||{}).synth).length;
+  let body='';
+  // Quiet nudge, not a card: one muted line with a link, dismissable, gone for good once you follow someone.
+  if(!real && !S.calloutDismissed) body += `<div class="nudge"><span>Nothing from friends yet.</span><button class="link" data-go="friends">Find friends</button><button class="x" data-dismiss-callout aria-label="Dismiss">✕</button></div>`;
+  body += friendEvents().map(ev=>ev.type==='cook'?card(ev.c):socialCard(ev)).join('');
+  S.feedPage=0;
+  body += `<div class="row-h" style="${cooks.length?'':'padding-top:6px'}"><h3 class="h-sec">Trending now</h3><span class="tiny muted">${tuned()}</span></div><div id="trendList">${feedBatch(0)}</div><div class="small muted" style="padding:14px 18px 24px;text-align:center">Scroll for more</div>`;
+  return brandHdr()+body;
+};
+// Trending respects restrictions and leans toward what the taste test liked; otherwise pure popularity.
+const trendPool = () => { const keys=tasteKeys().slice(0,4); return RECIPES.filter(r=>cover(r)&&allowed(r)).sort((a,b)=>{ const sa=a.k.filter(k=>keys.includes(k)).length, sb=b.k.filter(k=>keys.includes(k)).length; return (sb-sa)||(b.net-a.net); }); };
+const tuned = () => (S.diet||[]).length||(S.taste||[]).length ? 'tuned to you' : 'keeps going';
+const WHEN = k => ['','Earlier this week','Last week','Two weeks ago','Three weeks ago'][k] || (k-1)+' weeks ago';
+function feedBatch(k){
+  const base=trendPool(), per=4, start=(k*per)%base.length;
+  const items=[...Array(per)].map((_,i)=>base[(start+i)%base.length]);
+  const cards=items.map((r,i)=>catalogCard(r,sigOf(r),Math.max(1,Math.round(r.net/(k+1)/(1+i*.2)))));
+  if(k===0 && !tasteDone() && !S.tasteDismissed) cards.splice(2,0,tasteCard());
+  return (k?`<div class="label" style="padding:12px 18px 2px">${WHEN(k)}</div>`:'')+cards.join('');
+}
+function trendBase(){
+  const q=(S.exploreQ||'').trim().toLowerCase(), sig=S.exploreSig||'all';
+  let rs=trendPool();
+  if(q) rs=rs.filter(r=>(r.t+' '+r.a+' '+SRC(r).name+' '+r.k.join(' ')).toLowerCase().includes(q));
+  if(sig!=='all') rs=rs.filter(r=>sigOf(r).id===sig);
+  return rs;
+}
+function trendBatch(k){
+  const base=trendBase();
+  if(!base.length) return k?'':`<div class="empty"><p>Nothing for that yet. Try another word, or a different signal.</p></div>`;
+  const rot=(k*5)%base.length, arr=base.slice(rot).concat(base.slice(0,rot));
+  return (k?`<div class="label" style="padding:14px 18px 4px">${WHEN(k)}</div>`:'')+`<div class="list">${arr.map((r,i)=>{ const s=sigOf(r), n=Math.max(3,Math.round(r.net/(k+1)/(1+i*.15)));
+    return `<button class="rrow" data-recipe="${r.id}"><span class="rank">${k*arr.length+i+1}</span>${tile(r,{cls:'tr'})}<span class="txt"><b>${esc(r.t)}</b><span>${esc(SRC(r).name)}${SRC(r).type!=='cookbook'?' · '+mins(r.m):''}</span><span class="sig">${s.l}</span></span><span class="meta">${n} cooks</span></button>`; }).join('')}</div>`;
+}
+const srcMark = (s,cls='') => `<span class="srcmark ${cls}" aria-hidden="true">${esc(s.mark||s.name.split(/\s+/).map(w=>w[0]).join('').slice(0,3).toUpperCase())}</span>`;
+// The one way out to the source, same shape everywhere: source mark, label, small glyph. primary = the recipe page's main CTA.
+function openLink(r,{primary=false}={}){
+  const s=SRC(r), p=primary?' primary':'';
+  if(s.type==='subscription') return `<a class="openlink${p}" href="${s.url}" target="_blank" rel="noopener">${srcMark(s)}<span>Open in <b>${esc(s.name)}</b></span>${ICON.ext}</a>`;
+  if(s.type==='blog') return `<button class="openlink reader${p}" data-reader="${r.id}">${srcMark(s)}<span>Open in the <b>ad-free reader</b> · ${esc(s.name)}</span>${ICON.book}</button>`;
+  if(s.type==='own') return '';
+  return `<div class="openlink${p}" style="cursor:default">${srcMark(s)}<span><b>${esc(s.name)}</b> · page ${r.page}</span>${ICON.book}</div>`;
+}
+function card(c){
+  const r=R(c.r), u=U(c.u), fc=friendCooks(c.r).filter(x=>x.id!==c.id).length, liked=S.likes.includes(c.id), want=S.wants.includes(c.r), first=u.n.split(' ')[0];
+  return `<article class="card">
+    <div class="who"><button data-user="${u.id}" style="display:flex;align-items:center;gap:10px">${avatar(u)}<span><b>${esc(first)}</b> made</span></button><span class="t">${ago(c.t)}</span></div>
+    <button data-recipe="${r.id}" style="display:block;width:100%;text-align:left">${tile(r,{cls:'wide',photo:c.p,who:c.p?first:null,credit:!c.p})}
+      <div class="ttl">${esc(r.t)}</div><div class="src">${esc(r.a)}${SRC(r).type!=='cookbook'?' · '+mins(r.m):''}</div></button>
+    ${openLink(r)}
+    ${c.rt?`<div style="margin-top:8px">${stars(c.rt)}</div>`:''}
+    ${c.n?`<div class="note">“${esc(c.n)}”</div>`:''}
+    <div class="acts">
+      <button class="${liked?'on':''}" data-like="${c.id}">${liked?ICON.heartOn:ICON.heart}${liked?'Liked':'Like'}</button>
+      <button class="${want?'on':''}" data-want="${r.id}">${want?ICON.bmOn:ICON.bm}${want?'Saved':'Want to cook'}</button>
+      <button class="cnt" data-recipe="${r.id}">${fc?`<b>${fc+1}</b> friends made this`:''}</button>
+    </div></article>`;
+}
+// Saves and plans: lighter card, same shape as a cook, with the recipe row instead of the hero photo.
+function socialCard(ev){
+  const r=R(ev.r), u=U(ev.u), first=u.n.split(' ')[0], s=SRC(r), want=S.wants.includes(r.id);
+  const when = ev.type==='plan' ? dayLabel(new Date(ev.key+'T12:00').getTime()) : '';
+  const verb = ev.type==='plan' ? `is making this <b>${esc(when)}</b>` : 'saved';
+  const others = ev.type==='plan' ? friendsPlanning(r.id).filter(x=>x.u!==ev.u&&x.key===ev.key).map(x=>U(x.u).n.split(' ')[0]) : [];
+  const fc=friendCooks(r.id).length;
+  return `<article class="card lite">
+    <div class="who"><button data-user="${u.id}" style="display:flex;align-items:center;gap:10px">${avatar(u)}<span><b>${esc(first)}</b> ${verb}${others.length?` <span class="muted">with ${esc(others.join(', '))}</span>`:''}</span></button><span class="t">${ago(ev.t)}</span></div>
+    <button class="rrow" data-recipe="${r.id}" style="padding:0;gap:12px">${tile(r,{cls:'md'})}<span class="txt"><b style="white-space:normal">${esc(r.t)}</b><span>${esc(r.a)} · ${esc(s.name)}${s.type!=='cookbook'?' · '+mins(r.m):''}</span>${fc?`<span style="color:var(--green)">${fc} ${fc===1?'friend has':'friends have'} made this</span>`:''}</span></button>
+    <div class="acts">
+      <button class="${want?'on':''}" data-want="${r.id}">${want?ICON.bmOn:ICON.bm}${want?'Saved':ev.type==='save'?'Want to cook too':'Want to cook'}</button>
+      <button class="cnt" data-recipe="${r.id}">${ICON.ext.replace('<svg','<svg style="width:14px;height:14px"')} ${esc(s.name)}</button>
+    </div></article>`;
+}
+// Cold-start path B: the catalog itself fills the feed, credited to the source, until friends arrive.
+const topCatalog = n => RECIPES.filter(r=>cover(r)).slice().sort((a,b)=>b.net-a.net).slice(0,n);
+function catalogCard(r,sig=null,n=null){
+  const s=SRC(r), want=S.wants.includes(r.id); n=n||netCount(r.id);
+  return `<article class="card">
+    <div class="who">${srcMark(s,'lg')}<span><b>${esc(sig?sig.l:s.name)}</b>${sig?'':' · popular this week'}</span><span class="t">${n.toLocaleString()} cooks</span></div>
+    <button data-recipe="${r.id}" style="display:block;width:100%;text-align:left">${tile(r,{cls:'wide',credit:true})}<div class="ttl">${esc(r.t)}</div><div class="src">${esc(r.a)}${s.type!=='cookbook'?' · '+mins(r.m):''}</div></button>
+    ${openLink(r)}
+    <div class="acts">
+      <button data-madeit="${r.id}">${ICON.check}I made it</button>
+      <button class="${want?'on':''}" data-want="${r.id}">${want?ICON.bmOn:ICON.bm}${want?'Saved':'Want to cook'}</button>
+      <span class="cnt">${r.avg} avg rating</span>
+    </div></article>`;
+}
+function popularList(limit=8, filter=null){
+  const rows = RECIPES.filter(r=>!filter||r.s===filter).map(r=>({r,n:S.cooks.filter(c=>c.r===r.id&&now-c.t<7*DAY).length+Math.round(r.net/9)})).sort((a,b)=>b.n-a.n).slice(0,limit);
+  return rows.map((x,i)=>`<button class="rrow" data-recipe="${x.r.id}"><span class="rank">${i+1}</span>${tile(x.r,{cls:'sm'})}<span class="txt"><b>${esc(x.r.t)}</b><span>${SRC(x.r).name}</span></span><span class="meta">${x.n} cooks</span></button>`).join('');
+}
+function popularRail(title){
+  const rows = RECIPES.map(r=>({r,n:S.cooks.filter(c=>c.r===r.id&&now-c.t<7*DAY).length+Math.round(r.net/9)})).sort((a,b)=>b.n-a.n).slice(0,8);
+  return `<div class="row-h"><h3 class="h-sec">${title}</h3><button class="link" data-tab="explore">See all</button></div><div class="rail">${rows.map(x=>`<button class="item" data-recipe="${x.r.id}">${tile(x.r)}<b>${esc(x.r.t)}</b><span>${x.n} cooks this week</span></button>`).join('')}</div>`;
+}
+const TAGS=['Appetizer','Weeknight','Pasta','Chicken','Vegetarian','Sheet pan','Quick','Sunday project','Party'];
+views.explore = () => {
+  const q=S.exploreQ||'', sig=S.exploreSig||'all';
+  S.explorePage=0;
+  return brandHdr()+`<div class="pad"><label class="search">${ICON.search}<input id="exploreSearch" placeholder="Search a dish, ingredient or idea" autocomplete="off" value="${esc(q)}"></label></div>
+  <div class="chips">${TAGS.map(t=>`<button class="chip ${q.toLowerCase()===t.toLowerCase()?'on':''}" data-tag="${t}">${t}</button>`).join('')}</div>
+  <div class="row-h" style="padding-top:4px"><h3 class="h-sec" id="trendHead">${q?`“${esc(q)}”`:'Trending now'}</h3><span class="tiny muted">${q?'ranked by cooks this week':tuned()}</span></div>
+  ${srcChips(sig,'sig','margin:0;padding:0 18px 6px',[['all','All signals'],...SIGNALS.map(s=>[s.id,s.short])])}
+  <div id="trendList">${trendBatch(0)}</div>
+  <div class="small muted" style="padding:14px 18px 24px;text-align:center">Scroll for more</div>`;
+};
+views.diary = () => profile('me');
+function profile(uid){
+  const u = uid==='me'?{...U('me'),n:S.me.n,h:S.me.h}:U(uid);
+  const cooks = S.cooks.filter(c=>c.u===uid).sort((a,b)=>b.t-a.t);
+  const month = cooks.filter(c=>now-c.t<30*DAY).length;
+  const uniq = new Set(cooks.map(c=>c.r)).size;
+  const following = followList(uid,'following').length, followers = followList(uid,'followers').length;
+  const isMe = uid==='me';
+  const tab = isMe ? S.diaryTab : (S.userTab||'cooks');
+  const wants = isMe ? S.wants : ((S.fwants||{})[uid]||[]).map(w=>w.r);
+  const first = u.n.split(' ')[0];
+  let body='';
+  if(tab==='cooks'){
+    body = cooks.length ? `<div class="grid3">${cooks.map(c=>`<button data-cook="${c.id}">${tile(R(c.r),{photo:c.p,cap:R(c.r).t,corner:c.rt||null})}</button>`).join('')}</div>`
+      : isMe ? `<div class="empty"><h3>Log your first cook</h3><p>Tap the + button, search what you made, tap Log it.</p><button class="btn primary" data-open-log>Log a cook</button></div>` : `<div class="empty"><p>${esc(first)} hasn't logged anything yet.</p></div>`;
+  } else {
+    const w = wants.map(R);
+    body = w.length ? `<div class="grid3">${w.map(r=>`<button data-recipe="${r.id}">${tile(r,{cap:r.t})}</button>`).join('')}</div>`
+      : isMe ? `<div class="empty"><h3>Nothing saved yet</h3><p>Save recipes from anywhere with the share button, or tap Want to cook on any recipe.</p></div>` : `<div class="empty"><p>Nothing saved yet.</p></div>`;
+  }
+  // A friend's plan, read-only, with cook-along on each day
+  const fplan = isMe ? [] : ((S.fplan||{})[uid]||[]);
+  const fdays = weekDays().map(dd=>({...dd,rids:fplan.filter(pl=>pl.key===dd.key).map(pl=>pl.r)})).filter(dd=>dd.rids.length);
+  return (isMe?brandHdr():backHdr())+`
+  <div class="pad" style="display:flex;gap:14px;align-items:center;padding-top:6px">${avatar(u,'lg')}<div style="flex:1;min-width:0"><div class="title-d">${esc(u.n)}</div><div class="small muted">${esc(u.h)} · ${esc(u.bio)}</div></div></div>
+  <div class="stat"><div><b>${cooks.length}</b><span>cooks</span></div><button data-follows="following" data-follows-user="${uid}"><b>${following}</b><span>following</span></button><button data-follows="followers" data-follows-user="${uid}"><b>${followers}</b><span>followers</span></button>${isMe?'<div style="margin-left:auto;align-self:center"><button class="btn sm ghost">Edit</button></div>':`<div style="margin-left:auto;align-self:center"><button class="btn sm ${S.following.includes(uid)?'on':'primary'}" data-follow="${uid}">${S.following.includes(uid)?'Following':'Follow'}</button></div>`}</div>
+  ${isMe?`<div class="pad small muted" style="padding-top:10px">${month} this month · ${uniq} different recipes</div>`:''}
+  ${isMe?`<div class="row-h" style="padding-top:16px;padding-bottom:6px"><h3 class="h-sec" style="font-size:16px">Planning to cook</h3><span class="tiny muted">tap a day</span></div>
+  <div class="rail week">${weekDays().map(d=>{ const rids=planOf(d.key); return rids.length
+    ? `<button class="item day" data-plan-day="${d.key}">${dayTile(rids)}<b>${d.label}</b><span>${rids.length===1?esc(R(rids[0]).t):rids.length+' recipes'}</span></button>`
+    : `<button class="item day" data-plan-pick="${d.key}"><span class="tile tr emptyday">+</span><b>${d.label}</b><span>${d.date}</span></button>`; }).join('')}</div>`:''}
+  ${!isMe&&fdays.length?`<div class="row-h" style="padding-top:16px;padding-bottom:6px"><h3 class="h-sec" style="font-size:16px">${esc(first)} is planning</h3><span class="tiny muted">this week</span></div>
+  <div class="rail week">${fdays.map(dd=>`<button class="item day" data-friend-day="${dd.key}" data-friend="${uid}">${dayTile(dd.rids)}<b>${dd.label}</b><span>${dd.rids.length===1?esc(R(dd.rids[0]).t):dd.rids.length+' recipes'}</span></button>`).join('')}</div>`:''}
+  <div class="pad" style="padding-top:${isMe?8:14}px;padding-bottom:12px"><div class="seg"><button class="${tab==='cooks'?'on':''}" data-${isMe?'diary':'user-tab'}="cooks">Cooks</button><button class="${tab==='want'?'on':''}" data-${isMe?'diary':'user-tab'}="want">Want to cook (${wants.length})</button></div></div>
+  ${body}`;
+}
+views.user = () => profile(S.viewUser);
+// Who follows whom. For "me" it is real state; for other users a deterministic slice of the seeded friends.
+function followList(uid,kind){
+  const people = USERS.filter(u=>u.id!=='me'&&!u.synth);
+  if(uid==='me') return kind==='following' ? S.following.filter(id=>!(U(id)||{}).synth).map(U) : people;
+  const i = people.findIndex(u=>u.id===uid);
+  const others = people.filter(u=>u.id!==uid);
+  return kind==='following' ? others.slice(0,4) : [...others.slice(i%2,i%2+3), ...(S.following.includes(uid)?[{...U('me'),n:S.me.n,h:S.me.h}]:[])];
+}
+views.follows = () => {
+  const uid=S.followsUser, kind=S.followsTab, who = uid==='me'?'You':U(uid).n.split(' ')[0];
+  const list = followList(uid,kind);
+  const row = u => u.id==='me' ? `<div class="frow">${avatar(u)}<span class="txt"><b>${esc(u.n)}</b><span>${esc(u.h)} · you</span></span></div>` : frowFollow(u);
+  return backHdr(who==='You'?'My Kitchen':who)+`
+  <div class="pad" style="padding-top:4px;padding-bottom:10px"><div class="seg"><button class="${kind==='following'?'on':''}" data-follows="following" data-follows-user="${uid}">Following (${followList(uid,'following').length})</button><button class="${kind==='followers'?'on':''}" data-follows="followers" data-follows-user="${uid}">Followers (${followList(uid,'followers').length})</button></div></div>
+  <div class="pad" style="padding-bottom:20px">${list.length?list.map(row).join(''):`<div class="empty"><p>${kind==='following'?'Not following anyone yet.':'No followers yet.'}</p>${uid==='me'&&kind==='following'?'<button class="btn primary" data-go="friends">Find friends</button>':''}</div>`}</div>`;
+};
+// Similar recipes: shared concept keywords first, same source as a tiebreak.
+function similar(r,n=8){
+  return RECIPES.filter(x=>x.id!==r.id).map(x=>({x,s:x.k.filter(k=>r.k.includes(k)).length+(x.s===r.s?.5:0)+(cover(x)?.1:0)})).filter(o=>o.s>0).sort((a,b)=>b.s-a.s).slice(0,n).map(o=>o.x);
+}
+views.recipe = () => {
+  const r = R(S.viewRecipe), s=SRC(r), fc=friendCooks(r.id).sort((a,b)=>b.t-a.t), mine=myCooks(r.id).sort((a,b)=>b.t-a.t), want=S.wants.includes(r.id);
+  const photos = fc.filter(c=>c.p).slice(0,4);
+  let hero;
+  if(photos.length>=2){ hero = `<div class="collage">${photos.slice(0,4).map((c,i)=>tile(r,{photo:true,v:i})).join('')}</div>`; }
+  else if(mine.some(c=>c.p)||photos.length){ hero = `<div class="solo">${tile(r,{photo:true,who:photos.length?U(photos[0].u).n.split(' ')[0]:'Your'})}</div>`; }
+  else { hero = `<div class="solo">${tile(r,{credit:true})}</div>`; }
+  const net = netCount(r.id), sim = similar(r);
+  return backHdr('', `<button class="icon" aria-label="More" data-more="${r.id}"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>`)+`
+  <div class="hero">${hero}</div>
+  <div class="pad" style="padding-top:14px;display:flex;flex-direction:column;gap:8px">
+    <div class="title-d" style="font-size:24px">${esc(r.t)}</div>
+    <div class="small muted">${esc(r.a)}${s.type!=='cookbook'?' · '+mins(r.m):''}${net>=5?` · made ${net.toLocaleString()} times · ${r.avg}★`:''}</div>
+    ${openLink(r,{primary:true})}
+    <div class="two" style="margin-top:4px"><button class="btn secondary" data-madeit="${r.id}">${ICON.check} I made it</button><button class="btn ${want?'on':'ghost'}" data-want="${r.id}">${want?ICON.bmOn:ICON.bm} ${want?'Saved':'Want to cook'}</button></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="chip ${plannedFor(r.id)?'on':''}" data-plan="${r.id}">${ICON.cal} ${plannedFor(r.id)?'Cooking '+esc(Object.keys(S.plan).filter(k=>S.plan[k].includes(r.id)).map(k=>dayLabel(new Date(k+'T12:00').getTime())).join(', ')):'Plan a day'}</button>${mine.length?`<span class="small muted">Made ${mine.length} ${mine.length===1?'time':'times'} · last ${dateStr(mine[0].t)}</span>`:''}</div>
+  </div>
+  <div class="sep"></div>
+  ${(()=>{ const making=friendsPlanning(r.id).map(x=>({u:x.u,t:new Date(x.key+'T12:00').getTime(),making:true}));
+      const rows=[...making.sort((a,b)=>a.t-b.t), ...fc.map(c=>({u:c.u,t:c.t,c}))];
+      if(!rows.length) return '';
+      return `<div class="row-h" style="padding-top:4px"><h3 class="h-sec">Friends</h3><span class="avstack">${[...new Set(rows.map(x=>x.u))].slice(0,4).map(id=>avatar(U(id),'sm')).join('')}</span></div>
+      ${rows.map(x=>`<div class="friendrow">${avatar(U(x.u))}<div class="txt"><b>${esc(U(x.u).n.split(' ')[0])}</b> ${x.making?`<span class="muted">is making this</span> <b>${esc(dayLabel(x.t))}</b>`:`<span class="muted">made it</span> ${stars(x.c.rt)}`}${x.c&&x.c.n?`<span class="n">“${esc(x.c.n)}”</span>`:''}${x.c?`<span class="d">${dateStr(x.t)}</span>`:''}</div></div>`).join('')}<div class="sep"></div>`; })()}
+  ${sim.length?`<div class="row-h" style="padding-top:4px"><h3 class="h-sec">Similar recipes</h3><span class="tiny muted">${esc(r.k.slice(0,2).join(' · '))}</span></div>
+    <div class="rail" style="padding-bottom:24px">${sim.map(x=>`<button class="item" data-recipe="${x.id}">${tile(x)}<b>${esc(x.t)}</b><span>${esc(SRC(x).name)}</span></button>`).join('')}</div>`:''}`;
+};
+views.cook = () => {
+  const c = S.cooks.find(x=>x.id===S.viewCook), r=R(c.r), u=c.u==='me'?{...U('me'),n:S.me.n}:U(c.u);
+  return backHdr('')+`<div class="hero"><div class="solo">${tile(r,{photo:c.p,who:c.p?u.n.split(' ')[0]:null,credit:!c.p})}</div></div>
+  <div class="pad" style="padding-top:14px;display:flex;flex-direction:column;gap:8px">
+    <div class="who" style="display:flex;align-items:center;gap:10px">${avatar(u)}<span><b>${esc(u.n.split(' ')[0])}</b> made</span><span class="small muted" style="margin-left:auto">${dateStr(c.t)}</span></div>
+    <button class="title-d" data-recipe="${r.id}" style="text-align:left">${esc(r.t)}</button>
+    <div class="small muted">${SRC(r).name}</div>
+    ${c.rt?stars(c.rt,'lg'):''}
+    ${c.n?`<div style="font-style:italic;font-size:16px">“${esc(c.n)}”</div>`:''}
+    ${c.u==='me'?`<div class="two" style="margin-top:8px"><button class="btn ghost" data-madeit="${r.id}">Made it again</button><button class="btn ghost" style="color:var(--danger)" data-del="${c.id}">Delete</button></div>`:''}
+  </div>`;
+};
+const frowFollow = u => `<div class="frow"><button data-user="${u.id}" style="display:contents">${avatar(u)}<span class="txt"><b>${esc(u.n)}</b><span>${esc(u.h)} · ${S.cooks.filter(c=>c.u===u.id).length} cooks</span></span></button><button class="btn sm ${S.following.includes(u.id)?'on':'primary'}" data-follow="${u.id}">${S.following.includes(u.id)?'Following':'Follow'}</button></div>`;
+const frowInvite = c => `<div class="frow">${avatar({n:c.n,c:'#A8A29A'})}<span class="txt"><b>${esc(c.n)}</b><span>In your contacts · not on openRCP</span></span>${S.invited.includes(c.id)?`<span class="chip on" style="padding:5px 10px;gap:4px">${ICON.check.replace('<svg','<svg width="12" height="12"')}Invited</span>`:`<button class="btn sm ghost" data-invite-user="${c.id}">Invite</button>`}</div>`;
+const inviteCard = () => `<div class="invitecard"><span class="ic">${ICON.link}</span><span class="txt"><b>Your invite link</b><span class="link">openrcp.com/join/${esc(S.me.h.replace('@',''))}</span></span><button class="btn sm secondary" data-copy>Copy</button><button class="btn sm ghost" data-invite-user="any">Share</button></div>`;
+const syncRow = () => { const n=USERS.filter(u=>u.id!=='me'&&!u.synth).length; return `<button class="method" data-contacts><span class="ic">${ICON.contacts}</span><span class="txt"><b>${S.obContacts?'Contacts synced':'Sync contacts'}</b><span>${S.obContacts?`${n} friends found, ${CONTACTS.length} to invite`:'Matched on this phone. Names are never uploaded.'}</span></span>${S.obContacts?`<span style="color:var(--green)">${ICON.check.replace('<svg','<svg width="18" height="18"')}</span>`:ICON.chev}</button>`; };
+// Friends lives under More now (find, follow, invite).
+views.friends = () => {
+  const on = USERS.filter(u=>u.id!=='me'&&!u.synth);
+  return backHdr('Friends')+`
+  <div class="pad" style="padding-top:4px"><label class="search">${ICON.search}<input placeholder="Search by name or handle" id="friendSearch"></label></div>
+  <div class="pad" style="padding-top:4px">${syncRow()}${inviteCard()}</div>
+  <div class="row-h"><h3 class="h-sec">On openRCP</h3><span class="tiny muted">${on.length} from your contacts</span></div>
+  <div class="pad">${on.map(frowFollow).join('')}</div>
+  <div class="row-h"><h3 class="h-sec">Invite</h3><span class="tiny muted">${CONTACTS.length} contacts not on openRCP</span></div>
+  <div class="pad" style="padding-bottom:20px">${CONTACTS.map(frowInvite).join('')}</div>`;
+};
+// More: the home for everything that is not the feed, search or your kitchen. Settings and account live here.
+const moreRow = (icon,title,sub,attr,right=ICON.chev) => `<button class="method" ${attr}><span class="ic">${icon}</span><span class="txt"><b>${title}</b>${sub?`<span>${sub}</span>`:''}</span>${right}</button>`;
+const ICON_GEAR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+const ICON_HELP='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5V14"/><path d="M12 17h.01"/></svg>';
+views.me = () => {
+  const me={...U('me'),n:S.me.n,h:S.me.h}, nf=S.following.filter(id=>!(U(id)||{}).synth).length, unread=S.notifs.filter(n=>!n.read).length;
+  return brandHdr()+`
+  <button class="pad" data-tab="diary" style="display:flex;gap:14px;align-items:center;padding-top:6px;padding-bottom:14px;width:100%;text-align:left">${avatar(me,'lg')}<span style="flex:1;min-width:0"><span class="title-d" style="display:block">${esc(me.n)}</span><span class="small muted">${esc(me.h)} · ${myCooks().length} cooks · view My Kitchen</span></span>${ICON.chev}</button>
+  <div class="pad">
+    ${moreRow(ICON.contacts,'Friends',nf?`Following ${nf} · find and invite`:'Find and invite the people you eat with','data-go="friends"')}
+    ${moreRow(ICON.bell,'Notifications',unread?`${unread} new · choose what you get`:'Choose what you get','data-go="notifprefs"')}
+    ${moreRow(ICON_GEAR,'Settings','Account, privacy, logging defaults','data-go="settings"')}
+    <a class="method" href="mailto:support@openrcp.com?subject=openRCP%20feedback"><span class="ic">${ICON_HELP}</span><span class="txt"><b>Help and feedback</b><span>support@openrcp.com</span></span>${ICON.chev}</a>
+  </div>
+  <div class="pad tiny muted" style="padding-top:18px">openRCP · prototype build · <span style="text-decoration:underline">Privacy</span> · <span style="text-decoration:underline">Terms</span></div>`;
+};
+const NP=[['friendCooks','A friend logs a cook','The core of the feed. One push, batched if several land together.'],['wantlist','A friend makes something on your want list','The nudge that gets things cooked.'],['likes','Someone likes your cook',''],['follows','New follower',''],['plan','Morning reminder on a planned day','8am, only on days you planned something.'],['digest','Sunday digest','Your friends\' week in one push, Sunday 5pm.']];
+views.notifprefs = () => {
+  S.np=S.np||{friendCooks:true,wantlist:true,likes:true,follows:true,plan:true,digest:true};
+  const unread=S.notifs.filter(n=>!n.read).length;
+  return backHdr('Notifications')+`
+  <div class="pad" style="padding-top:2px"><button class="method" data-go="notifs"><span class="ic">${ICON.bell}</span><span class="txt"><b>Recent</b><span>${unread?`${unread} new`:'Nothing new'}</span></span>${ICON.chev}</button></div>
+  <div class="row-h" style="padding-bottom:4px"><h3 class="h-sec" style="font-size:15px">Send me a push when</h3></div>
+  <div class="pad">${NP.map(([k,t,sub])=>`<div class="method" style="padding:11px 0"><span class="txt"><b>${t}</b>${sub?`<span style="white-space:normal">${sub}</span>`:''}</span><span class="seg" style="padding:2px;gap:2px;flex:none"><button class="${S.np[k]?'on':''}" data-np="${k}" data-np-val="1" style="padding:4px 10px;font-size:12px">On</button><button class="${S.np[k]?'':'on'}" data-np="${k}" data-np-val="0" style="padding:4px 10px;font-size:12px">Off</button></span></div>`).join('')}</div>
+  <div class="pad tiny muted" style="padding:14px 18px 24px">No marketing pushes, ever. Email is only for account and security.</div>`;
+};
+views.settings = () => {
+  const sec=(t,rows)=>`<div class="row-h" style="padding-bottom:4px"><h3 class="h-sec" style="font-size:15px">${t}</h3></div><div class="pad">${rows.join('')}</div>`;
+  const row=(t,sub,right)=>`<div class="method" style="padding:11px 0"><span class="txt"><b>${t}</b>${sub?`<span>${sub}</span>`:''}</span>${right||ICON.chev}</div>`;
+  const tog=on=>`<span class="seg" style="padding:2px;gap:2px"><button class="${on?'on':''}" style="padding:4px 10px;font-size:12px">On</button><button class="${on?'':'on'}" style="padding:4px 10px;font-size:12px">Off</button></span>`;
+  return backHdr('Settings')+`
+  ${sec('Account',[row('Name and handle',`${esc(S.me.n)} · ${esc(S.me.h)}`),row('Signed in with','Apple · ben.cooks@icloud.com'),row('Private account','Only people you approve see your cooks',tog(false))])}
+  ${sec('Food',[row('Dietary',(S.diet||[]).length?(S.diet.map(k=>(DIETS.find(d=>d[0]===k)||[])[2]).join(', ')):'I eat everything'),`<button class="method" data-taste-open style="padding:11px 0"><span class="txt"><b>Taste profile</b><span>${(S.taste||[]).length?`Leans ${esc(tasteKeys().slice(0,3).join(', '))} · tap to retake`:'Not set · take the 20-second test'}</span></span>${ICON.chev}</button>`])}
+  ${sec('Logging',[row('Default visibility',`New cooks go to: ${S.lastVis==='me'?'Only me':'Friends'}`),row('Clipboard detection','Offer to log a recipe link you just copied',tog(true))])}
+  ${sec('Sources',[row('NYT Cooking links','Open in the NYT Cooking app when it is installed'),row('Ad-free reader','On for blogs · never for subscription sites',tog(true))])}
+  ${sec('Account actions',[row('Sign out',''),row('Delete account','Removes your cooks, photos and profile',`<span class="small" style="color:var(--danger)">…</span>`)])}
+  <div style="height:24px"></div>`;
+};
+views.notifs = () => {
+  S.notifs.forEach(n=>n.read=true);
+  const week = friendCooks().filter(c=>now-c.t<7*DAY).sort((a,b)=>b.t-a.t);
+  return backHdr('Notifications')+`${S.notifs.length?S.notifs.map(n=>`<button class="notif" data-recipe="${n.r}">${tile(R(n.r),{cls:'sm'})}<span class="txt">${n.txt}<span>${ago(n.t)} ago</span></span></button>`).join(''):'<div class="empty"><p>Nothing yet.</p></div>'}
+  <div class="row-h"><h3 class="h-sec">This week's digest</h3><span class="tiny muted">${week.length} cooks</span></div>
+  <div class="list">${week.map(c=>`<button class="rrow" data-recipe="${c.r}">${tile(R(c.r),{cls:'sm',photo:c.p})}<span class="txt"><b>${esc(R(c.r).t)}</b><span>${esc(U(c.u).n.split(' ')[0])} · ${ago(c.t)}${c.rt?' · '+c.rt+'★':''}</span></span></button>`).join('')}</div>`;
+};
+views.reader = () => {
+  const r = R(S.viewRecipe), s=SRC(r);
+  const steps=['Heat the oven to 425°F. Cut the potatoes into 1-inch pieces and toss with 2 tablespoons oil, half the salt and the rosemary. Spread on a sheet pan and roast 15 minutes.','Pat the chicken dry. Rub with the remaining oil, salt, pepper, garlic and lemon zest.','Push the potatoes to the edges, set the chicken skin side up in the middle, and tuck the lemon halves in. Roast until the chicken reaches 165°F, 25 to 30 minutes.','Squeeze the roasted lemon over everything and rest 5 minutes before serving.'];
+  const ings=['1½ pounds small Yukon Gold potatoes','4 bone-in, skin-on chicken thighs','3 tablespoons olive oil','2 teaspoons kosher salt, divided','2 garlic cloves, grated','1 lemon, zested and halved','2 sprigs rosemary, leaves chopped','Black pepper'];
+  return backHdr('Back', `<a class="icon" href="${s.url}" target="_blank" rel="noopener" aria-label="View original">${ICON.ext}</a>`)+`
+  <div class="reader">
+    <div class="eyebrow">Ad-free reader</div>
+    <h1>${esc(r.t)}</h1>
+    <div class="meta"><span>${esc(r.a)}</span><span>${mins(r.m)}</span><span>Serves 4</span></div>
+    <div class="asseen"><span>As seen on <b>${esc(s.name)}</b></span><a href="${s.url}" target="_blank" rel="noopener">View original ↗</a></div>
+    <h2>Ingredients</h2><ul>${ings.map(i=>`<li>${i}</li>`).join('')}</ul>
+    <h2>Steps</h2><ol>${steps.map((st,i)=>`<li><label class="stepchk"><input type="checkbox" id="step${i}"><span>${st}</span></label></li>`).join('')}</ol>
+    <div style="margin-top:22px"><button class="btn primary wide" data-madeit="${r.id}">I made it</button></div>
+    <p class="tiny muted" style="margin-top:14px">Prototype note: this reader shows sample recipe text for one entry. In the product it renders the blog's own recipe on demand for the signed-in user, never as a public page.</p>
+  </div>`;
+};
+
+/* ---------- Onboarding ---------- */
+let obStep=1;
+// Onboarding after sign-in: 2 handle · 3 what you eat · 4 friends · 5 first log. The taste test lives in the feed.
+const OB_LAST=5;
+const obDots = () => `<div class="dots">${[2,3,4,5].map(i=>`<i class="${i===obStep?'on':''}"></i>`).join('')}</div>`;
+const obHdr = backTo => `<div class="obhdr">${backTo?`<button class="back" data-ob="${backTo}">${ICON.back}Back</button>`:'<span></span>'}<span class="tiny muted">${obStep-1} of ${OB_LAST-1}</span></div>`;
+// Dietary restrictions: tap what applies. Each carries the keywords it rules out, so the feed and the taste deck respect it immediately.
+const DIETS=[['vegetarian','🥦','Vegetarian',['chicken','seafood','fish','shrimp','roast']],['vegan','🌱','Vegan',['chicken','seafood','fish','shrimp','roast','pizza']],['pescatarian','🐟','Pescatarian',['chicken','roast']],['glutenfree','🌾','Gluten-free',['pasta','noodles','pizza']],['dairyfree','🥛','Dairy-free',[]],['nuts','🥜','Nut allergy',[]],['shellfish','🦐','No shellfish',['shrimp','seafood']],['pork','🐖','No pork',[]],['halal','🕌','Halal',[]],['kosher','✡️','Kosher',['shrimp','seafood']],['lowcarb','🥩','Low-carb',['pasta','noodles','pizza','rice','potatoes']]];
+const SLASH='<path d="m4 20 16-16"/>';
+const dsvg = (inner,slash=false) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${inner}${slash?SLASH:''}</svg>`;
+const DIET_ICON={
+  all: dsvg('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/>'),
+  vegetarian: dsvg('<path d="M5 19c0-8 5-13 14-13-1 9-6 13-14 13z"/><path d="M5 19c3-4 6-7 10-9"/>'),
+  vegan: dsvg('<path d="M12 21v-8"/><path d="M12 13c0-4 2.5-6.5 7-6.5 0 4.5-2.5 6.5-7 6.5z"/><path d="M12 13c0-3-2-5-6-5 0 3.5 2 5 6 5z"/>'),
+  pescatarian: dsvg('<path d="M4 12c3-4 6-6 10-6 3 0 5 2 7 6-2 4-4 6-7 6-4 0-7-2-10-6z"/><path d="M4 12 2 8M4 12l-2 4"/><circle cx="16" cy="11" r="1" fill="currentColor" stroke="none"/>'),
+  glutenfree: dsvg('<path d="M12 21V8"/><path d="M12 11c-3 0-4.5-1.5-4.5-4C10 7 12 8.5 12 11zM12 11c3 0 4.5-1.5 4.5-4C14 7 12 8.5 12 11zM12 15.5c-3 0-4.5-1.5-4.5-4 2.5 0 4.5 1.5 4.5 4zM12 15.5c3 0 4.5-1.5 4.5-4-2.5 0-4.5 1.5-4.5 4z"/>',true),
+  dairyfree: dsvg('<path d="M8 3h8l2 4.5V21H6V7.5z"/><path d="M6 7.5h12M8 3l2 4.5"/>',true),
+  nuts: dsvg('<path d="M8 5c2-2 6-2 8 0 2 3 1.5 9-4 13-5.5-4-6-10-4-13z"/><path d="M8 9h8"/>',true),
+  shellfish: dsvg('<path d="M7 8c0-3 3-5 6.5-5S20 5 20 8s-2 4-5 4h-2c-2 0-3 1-3 3s1 3 3 3h2"/><circle cx="15.5" cy="7" r="1" fill="currentColor" stroke="none"/>',true),
+  pork: dsvg('<path d="M5 13c0-4 3-7 7-7s7 3 7 7-3 6-7 6-7-2-7-6z"/><ellipse cx="12" cy="14" rx="3" ry="2.2"/><path d="M11 14h.01M13 14h.01M6 10 4 7M18 10l2-3"/>',true),
+  halal: dsvg('<path d="M14 4a8 8 0 1 0 6 13.5A7 7 0 1 1 14 4z"/><circle cx="18.5" cy="10.5" r="1.3" fill="currentColor" stroke="none"/>'),
+  kosher: dsvg('<path d="M12 3.5 19.4 16H4.6z"/><path d="M12 20.5 4.6 8h14.8z"/>'),
+  lowcarb: dsvg('<path d="M6 10.5a3.25 3.25 0 0 1 0-6.5h12a3.25 3.25 0 0 1 0 6.5V20H6z"/><path d="M6 10.5h12"/>',true)
+};
+// Muted food colours per restriction: tinted badge, saturated stroke. Colourful without being cartoon.
+const DIET_COLOR={all:'#6B6560',vegetarian:'#3E8E5A',vegan:'#5B9A3C',pescatarian:'#2F7FA8',glutenfree:'#C28B2C',dairyfree:'#5C7FA3',nuts:'#9A6B3F',shellfish:'#D9664A',pork:'#C96B8A',halal:'#2E8B84',kosher:'#5B5FA8',lowcarb:'#7E8C3A'};
+const dietBadge = k => `<span class="ic" style="background:${DIET_COLOR[k]}22;color:${DIET_COLOR[k]}">${DIET_ICON[k]}</span>`;
+const allowed = r => !(S.diet||[]).some(d=>{ const x=(DIETS.find(y=>y[0]===d)||[])[3]||[]; return x.some(k=>r.k.includes(k)); });
+// Taste deck: 8 cards across sources and concepts, already filtered by restrictions.
+function tasteDeck(){ const pref=['r2','r3','r4','r7','r13','r16','r18','r22','r5','r11','r19','r23','r15','r20','r1','r6','r8','r9','r10','r12','r14','r17','r21','r24']; return pref.map(R).filter(r=>r&&allowed(r)).slice(0,8); }
+const tasteDone = () => { const n=tasteDeck().length; return n>0 && (S.tasteIdx||0)>=n; };
+const tasteKeys = () => { const n={}; (S.taste||[]).forEach(id=>R(id).k.forEach(k=>n[k]=(n[k]||0)+1)); return Object.entries(n).sort((a,b)=>b[1]-a[1]).map(x=>x[0]); };
+const OB_SRCS=[['all','All sources'],['nyt','NYT Cooking'],['sk','Smitten Kitchen'],['se','Serious Eats'],['ba','Bon Appétit'],['hbh','Half Baked Harvest'],['bb','Budget Bytes'],['cookbook','Cookbooks']];
+const srcLabel = k => (OB_SRCS.find(x=>x[0]===k)||OB_SRCS[0])[1];
+const srcChips = (cur,attr,style='',opts=OB_SRCS) => `<div class="rchips" role="radiogroup" style="${style}">${opts.map(([k,n])=>`<button class="rchip ${cur===k?'on':''}" data-${attr}="${k}" role="radio" aria-checked="${cur===k}"><i></i>${n}</button>`).join('')}</div>`;
+function catalogSearch(q,src,limit=8){
+  q=(q||'').trim().toLowerCase();
+  let rs=RECIPES.slice();
+  if(src&&src!=='all') rs=rs.filter(r=>src==='cookbook'?SRC(r).type==='cookbook':r.s===src);
+  if(q) rs=rs.filter(r=>(r.t+' '+r.a+' '+SRC(r).name+' '+(r.k||[]).join(' ')).toLowerCase().includes(q)); else rs.sort((a,b)=>b.net-a.net);
+  return rs.slice(0,limit);
+}
+function obRows(){
+  const q=S.obQ||'', picked=S.obPicked||[], src=S.obSrc||'all', rs=catalogSearch(q,src,10);
+  return (q.trim()?'':`<div class="label" style="padding:10px 0 4px">Popular this week${src!=='all'?' on '+esc(srcLabel(src)):''}</div>`)+
+    `<div class="list" style="margin:0 -22px">${rs.map(r=>`<button class="rrow ${picked.includes(r.id)?'sel':''}" data-pick="${r.id}" style="padding-left:22px;padding-right:22px" role="checkbox" aria-checked="${picked.includes(r.id)}">${tile(r,{cls:'sm'})}<span class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span></span><span class="chk">${ICON.check}</span></button>`).join('')}${rs.length?'':`<div class="small muted" style="padding:12px 22px">Nothing matches. Try another source, or paste a link later from +.</div>`}</div>`;
+}
+function obFootBtn(){ const n=(S.obPicked||[]).length; return `<button class="btn primary wide" data-logmulti ${n?'':'disabled'}>${n?`Log ${n} ${n===1?'cook':'cooks'}`:'Tick what you made'}</button>`; }
+views.onboard = () => {
+  if(obStep===1) return `<div class="ob" style="padding-top:18px"><div class="collage">${['r1','r17','r13','r6','r15','r3'].map((id,i)=>tile(R(id),{photo:true,v:i})).join('')}</div>
+    <div class="spacer"></div><h1>So, what are your friends cooking?</h1><p>All the food photos. None of the kid photos.</p>
+    <div class="auth"><button class="btn wide apple" data-oauth="apple"><span class="logo-slot" aria-hidden="true"></span>Continue with Apple</button><button class="btn wide google" data-oauth="google"><span class="logo-slot" aria-hidden="true"></span>Continue with Google</button><button class="btn wide ghost" data-oauth="email">${ICON.mail}Continue with email</button></div></div>`;
+  if(obStep===2) return `<div class="obwrap">${obHdr(1)}<h1>Pick a handle</h1><p>Friends find you by handle. Name and email came from your account.</p>
+    <div style="display:flex;gap:12px;align-items:center">${avatar({n:S.me.n,c:'#01281A'},'lg')}<div style="flex:1;display:flex;flex-direction:column;gap:8px"><input class="field" id="obName" value="${esc(S.me.n)}" placeholder="Your name"><input class="field" id="obHandle" value="${esc(S.me.h)}" placeholder="@yourname"></div></div>
+    <div class="spacer"></div><div class="obfoot"><button class="btn primary wide" data-ob="3">Continue</button>${obDots()}</div></div>`;
+  if(obStep===3){
+    const diet=S.diet||[];
+    return `<div class="obwrap">${obHdr(2)}<h1>Anything we should keep off your plate?</h1><p>Tap what applies. Friends never see this; it only tunes what we show you.</p>
+      <div class="obscroll"><div class="dietgrid">
+        <button class="diet ${diet.length?'':'on'}" data-diet="none">${dietBadge('all')}<span>I eat everything</span></button>
+        ${DIETS.map(([k,e,n])=>`<button class="diet ${diet.includes(k)?'on':''}" data-diet="${k}">${dietBadge(k)}<span>${n}</span></button>`).join('')}
+      </div></div>
+      <div class="obfoot"><button class="btn primary wide" data-ob="4">${diet.length?`Continue · ${diet.length} noted`:'Continue'}</button>${obDots()}</div></div>`;
+  }
+  if(obStep===4){
+    const on=USERS.filter(u=>u.id!=='me'&&!u.synth), nf=S.following.length;
+    return `<div class="obwrap">${obHdr(3)}<h1>Find your friends</h1><p>openRCP is better with people you actually eat with.</p>
+      <div class="obscroll">${syncRow()}${inviteCard()}
+        ${S.obContacts?`<div class="row-h" style="padding:16px 0 4px"><h3 class="h-sec" style="font-size:15px">On openRCP</h3><span class="tiny muted">${on.length} of ${on.length+CONTACTS.length} contacts</span></div>${on.map(frowFollow).join('')}
+        <div class="row-h" style="padding:18px 0 4px"><h3 class="h-sec" style="font-size:15px">Invite</h3><span class="tiny muted">${CONTACTS.length} not on openRCP yet</span></div>${CONTACTS.map(frowInvite).join('')}<div style="height:12px"></div>`:''}
+      </div>
+      <div class="obfoot"><button class="btn primary wide" data-ob="5">${nf?`Continue · following ${nf}`:'Skip for now'}</button>${obDots()}</div></div>`;
+  }
+  const src=S.obSrc||'all';
+  return `<div class="obwrap">${obHdr(4)}<h1>Log something you cooked this week</h1><p>Pick a source, search, tick everything you made.</p>
+    ${srcChips(src,'obsrc')}
+    <label class="search" style="margin-top:8px">${ICON.search}<input id="obSearch" placeholder="${src==='all'?'Search any recipe':'Search '+esc(srcLabel(src))}" autocomplete="off"></label>
+    <div class="obscroll" id="obResults">${obRows()}</div>
+    <div class="obfoot" id="obFoot">${obFootBtn()}<button class="skip" data-ob="done">Skip for now</button>${obDots()}</div></div>`;
+};
+
+/* ---------- Navigation ---------- */
+const $views = document.getElementById('views'), $tabbar=document.getElementById('tabbar'), $overlay=document.getElementById('overlay');
+function render(){
+  const v = S.onboarded ? (S.stack.length ? S.stack[S.stack.length-1] : S.tab) : 'onboard';
+  if(!S.stack.length) histDepth=0;
+  $views.innerHTML = views[v]();
+  $views.scrollTop = 0;
+  $tabbar.hidden = !S.onboarded;
+  $tabbar.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', !S.stack.length && b.dataset.tab===S.tab));
+  const ex = document.getElementById('exploreSearch'); if(ex){ ex.addEventListener('input',()=>{ S.exploreQ=ex.value; S.explorePage=0; const l=document.getElementById('trendList'); if(l) l.innerHTML=trendBatch(0); const h=document.getElementById('trendHead'); if(h) h.textContent=ex.value.trim()?`“${ex.value.trim()}”`:'Trending now'; }); }
+  // Infinite scroll on Feed and Search: append the next trending batch near the bottom.
+  $views.onscroll = (v==='explore'||v==='feed') ? ()=>{ if($views.scrollTop+$views.clientHeight < $views.scrollHeight-260) return; const list=document.getElementById('trendList'); if(!list) return; const key=v==='explore'?'explorePage':'feedPage'; if((S[key]||0)>=12) return; S[key]=(S[key]||0)+1; list.insertAdjacentHTML('beforeend', v==='explore'?trendBatch(S[key]):feedBatch(S[key])); } : null;
+  const ob = document.getElementById('obSearch'); if(ob){ ob.value=S.obQ||''; ob.focus(); ob.addEventListener('input',()=>{ S.obQ=ob.value; const el=document.getElementById('obResults'); if(el) el.innerHTML=obRows(); }); }
+  const cs = document.getElementById('ctlSynth'); if(cs) cs.checked=!!S.synth;
+  bindDeck();
+}
+// In-app navigation mirrors browser history so the phone's back gesture (and Android back) works: a pushed view pops, an open sheet closes.
+let histDepth=0;
+function go(view,extra={}){ Object.assign(S,extra); S.stack.push(view); try{ history.pushState({rcp:++histDepth},''); }catch(e){} render(); }
+function back(){ if(histDepth>0 && S.stack.length){ history.back(); return; } S.stack.pop(); render(); }
+function setTab(t){ S.tab=t; S.stack=[]; histDepth=0; render(); }
+window.addEventListener('popstate',()=>{
+  if($overlay.innerHTML.trim()){ closeOverlay(); if(S.stack.length){ try{ history.pushState({rcp:histDepth},''); }catch(e){} } return; }
+  if(S.stack.length){ S.stack.pop(); histDepth=Math.max(0,histDepth-1); render(); }
+});
+function searchResults(q){ q=q.trim().toLowerCase(); if(!q) return []; return RECIPES.filter(r=>(r.t+' '+r.a+' '+SRC(r).name).toLowerCase().includes(q)).slice(0,8); }
+function searchInto(q,targetId,action){
+  const el=document.getElementById(targetId); if(!el) return;
+  const rs=searchResults(q);
+  el.innerHTML = q.trim() ? `<div class="list">${rs.map(r=>`<button class="rrow" data-${action}="${r.id}">${tile(r,{cls:'sm'})}<span class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span></span></button>`).join('')}<button class="rrow" data-paste><span class="tile sm" style="background:var(--cream)">${ICON.link}</span><span class="txt"><b>Paste a link</b><span>Any recipe URL. openRCP reads the title, author and photo.</span></span></button>${rs.length?'':`<button class="rrow" data-addname="${esc(q)}"><span class="tile sm" style="background:var(--cream)">+</span><span class="txt"><b>Not here? Add “${esc(q)}”</b><span>Creates an entry with no source</span></span></button>`}</div>` : '';
+}
+
+/* ---------- Sheets ---------- */
+function toast(b,s){ const t=document.createElement('div'); t.className='toast'; t.innerHTML=`<b>${b}</b>${s?`<span>${s}</span>`:''}`; document.getElementById('phone').appendChild(t); setTimeout(()=>t.remove(),2600); }
+function closeOverlay(){ $overlay.innerHTML=''; }
+const LOG_CHIP_STYLE='margin:0;padding:2px 18px 8px';
+const linkRow = sub => `<button class="method" data-paste style="padding:10px 18px;border-bottom:0"><span class="ic">${ICON.link}</span><span class="txt"><b>Paste a link</b><span>${sub}</span></span>${ICON.chev}</button>`;
+// Every sheet gets a visible way out: Back when it came from another sheet, Cancel otherwise.
+const sheetHdr = (title,{back=null,right='Cancel'}={}) => `<div class="sheethdr">${back?`<button class="back" data-${back}>${ICON.back}Back</button>`:`<span></span>`}<b>${esc(title)}</b><button class="small muted" data-close>${right}</button></div>`;
+function openLog(){
+  S.logSrc=S.logSrc||'all';
+  $overlay.innerHTML = `<div class="scrim" data-close><div class="sheet" style="height:92%"><div class="grab"></div>${sheetHdr('Log a cook')}<div class="body" style="gap:0;padding-left:0;padding-right:0">
+    <div class="pad" style="padding-bottom:8px"><label class="search">${ICON.search}<input id="logSearch" placeholder="What did you make?" autocomplete="off"></label></div>
+    <div id="logSrcChips">${srcChips(S.logSrc,'logsrc',LOG_CHIP_STYLE)}</div>
+    <div id="logResults"></div>
+    <div id="logQuick">
+      ${linkRow('NYT Cooking, any blog, Instagram. Reads the title, author and photo.')}
+      <div class="row-h" style="padding-top:6px"><h3 class="h-sec">Cook again</h3></div>
+      <div class="rail">${[...new Map(myCooks().sort((a,b)=>b.t-a.t).map(c=>[c.r,c])).values()].slice(0,6).map(c=>`<button class="item" data-madeit="${c.r}">${tile(R(c.r),{photo:c.p})}<b>${esc(R(c.r).t)}</b><span>${dateStr(c.t)}</span></button>`).join('')||'<div class="pad small muted">Nothing logged yet.</div>'}</div>
+      <div class="row-h"><h3 class="h-sec">Want to cook</h3></div>
+      <div class="rail">${S.wants.map(id=>`<button class="item" data-madeit="${id}">${tile(R(id))}<b>${esc(R(id).t)}</b><span>${SRC(R(id)).name}</span></button>`).join('')||'<div class="pad small muted">Your want list is empty.</div>'}</div>
+    </div></div></div></div>`;
+  const inp=document.getElementById('logSearch'); inp.focus();
+  inp.addEventListener('input',paintLog);
+}
+function paintLog(){
+  const inp=document.getElementById('logSearch'), el=document.getElementById('logResults'), quick=document.getElementById('logQuick'); if(!inp||!el) return;
+  const q=inp.value, src=S.logSrc||'all';
+  if(!q.trim()&&src==='all'){ el.innerHTML=''; quick.hidden=false; return; }
+  const rs=catalogSearch(q,src,8); quick.hidden=true;
+  el.innerHTML=`${q.trim()?'':`<div class="label" style="padding:6px 18px">Popular on ${esc(srcLabel(src))}</div>`}<div class="list">${rs.map(r=>`<button class="rrow" data-madeit="${r.id}">${tile(r,{cls:'sm'})}<span class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span></span></button>`).join('')}
+    ${linkRow('Any recipe URL')}
+    ${rs.length?'':`<button class="method" data-addname="${esc(q)}" style="padding:10px 18px;border-bottom:0"><span class="ic" style="font-weight:600">+</span><span class="txt"><b>Not here? Add “${esc(q)}”</b><span>Creates an entry with no source</span></span></button>`}</div>`;
+}
+let draft=null;
+function openMade(rid,{fromShare=false, photoFirst=false, fromLog=false}={}){
+  const r=R(rid), prior=myCooks(rid).length;
+  draft={r:rid,p:photoFirst,rt:0,n:'',vis:S.lastVis,t:now,pick:false};
+  const paint=()=>{
+    const el=document.getElementById('madeBody'); if(!el) return;
+    el.innerHTML=`<div class="rhead">${tile(r,{cls:'md'})}<div class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span>${prior?`<i>You've made this ${prior} ${prior===1?'time':'times'}</i>`:''}</div></div>
+    <button class="phototile" data-photo>${draft.p?tile(r,{photo:true,who:'Your'})+`<span style="position:relative;z-index:1;background:rgba(255,255,255,.9);color:#1F1A14;border-radius:999px;padding:4px 10px;font-size:12px">Change photo</span>`:`${ICON.cam} Add photo <span class="tiny muted" style="font-weight:400">optional</span>`}</button>
+    <div><div class="label" style="margin-bottom:6px">Rating <span style="font-weight:400;text-transform:none;letter-spacing:0">optional</span></div><div class="stars lg">${[1,2,3,4,5].map(i=>`<button class="${i<=draft.rt?'':'off'}" data-rate="${i}" aria-label="${i} stars">${ICON.star}</button>`).join('')}</div></div>
+    <input class="field" id="madeNote" placeholder="Anything to remember? (doubled the garlic)" maxlength="140" value="${esc(draft.n)}">
+    <div style="display:flex;gap:8px;align-items:center"><button class="chip ${draft.pick?'on':''}" data-datepick aria-expanded="${draft.pick}">${ICON.cal} ${dayLabel(draft.t)}</button><div class="seg" style="flex:1"><button class="${draft.vis==='friends'?'on':''}" data-vis="friends">Friends</button><button class="${draft.vis==='me'?'on':''}" data-vis="me">Only me</button></div></div>
+    ${draft.pick?`<div class="daypick">${[0,1,2,3,4,5,6].map(o=>{ const t=now-o*DAY; return `<button class="chip ${sameDay(t,draft.t)?'on':''}" data-setday="${o}">${o===0?'Today':o===1?'Yesterday':new Date(t).toLocaleDateString(undefined,{weekday:'short'})}</button>`; }).join('')}<label class="chip">${ICON.cal}<input type="date" id="madeDate" max="${isoDate(now)}" value="${isoDate(draft.t)}" aria-label="Pick a date"></label></div>`:''}
+    <button class="btn primary wide" data-logit>Log it</button>`;
+    const n=document.getElementById('madeNote'); n.addEventListener('input',()=>draft.n=n.value);
+    const dI=document.getElementById('madeDate'); if(dI) dI.addEventListener('change',()=>{ const [y,m,d]=dI.value.split('-').map(Number); if(!y) return; draft.t=Math.min(new Date(y,m-1,d,18,0,0).getTime(),now); draft.pick=false; paint(); });
+  };
+  if(!fromShare){
+    $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet"><div class="grab"></div>${sheetHdr('I made it',{back:fromLog?'reopen-log':null})}<div class="body" id="madeBody"></div></div></div>`;
+  }
+  paint();
+  $overlay.paint=paint;
+}
+function openShare(rid,{unresolved=false,url='',via='share',coach=''}={}){
+  const r=rid?R(rid):null;
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet"><div class="grab"></div>
+    <div class="pad" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px"><span class="small muted">${via==='paste'?'From your link':'Share to'}</span><span class="brand" style="display:flex;align-items:center;gap:6px;font-family:var(--display)">${ICON.logo.replace('<svg','<svg width="18" height="18"')} openRCP</span><button class="small muted" data-close>Cancel</button></div>
+    <div class="body" id="shareBody" style="gap:12px">
+      ${coach?`<div class="coach inl"><b>3</b><span>${coach}</span></div>`:''}
+      ${r?`<div class="rhead">${tile(r,{cls:'md'})}<div class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span>${SRC(r).type==='blog'?`<i>${ICON.book.replace('<svg','<svg width="11" height="11"')} Ad-free reader available</i>`:''}${myCooks(rid).length?`<i>You've made this ${myCooks(rid).length} ${myCooks(rid).length===1?'time':'times'}</i>`:''}</div></div>
+         <div class="tiny muted">Matched from the link. Title, author and photo are the source's own; openRCP links back and never copies the recipe.</div>`
+       :`<div class="rhead"><span class="ic" style="width:44px;height:44px;border-radius:10px;background:var(--cream);display:grid;place-items:center;flex:none">${ICON.link.replace('<svg','<svg width="20" height="20"')}</span><div class="txt"><b>Couldn't read this one</b><span style="white-space:normal">${esc(url)}</span></div></div><input class="field" id="shareTitle" placeholder="What is it? (title)"><div class="tiny muted">No recipe metadata on that page. Saved as your own entry, linked to the URL.</div>`}
+      <div class="two"><button class="btn primary" data-share-made="${rid||''}">I made it</button><button class="btn secondary" data-share-want="${rid||''}">Want to cook</button></div>
+    </div></div></div>`;
+  setTimeout(()=>{ const t=document.getElementById('shareTitle'); if(t) t.focus(); }, 50);
+  document.getElementById('shareBody').dataset.rid=rid||'';
+}
+/* ---------- Sign-in, invite, paste-a-link, share handoff demo, cold-start seeding ---------- */
+function openEmail(step='enter',email=''){
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet sys"><div class="grab"></div>${sheetHdr('')}<div class="body" style="gap:12px;padding-top:0">
+    ${step==='enter'?`<div class="syshead"><b>Continue with email</b><span>We'll send a sign-in link. No password to make up.</span></div>
+      <input class="field" id="emailField" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(email)}">
+      <button class="btn primary wide" data-email-send>Send me a link</button>`
+    :`<div class="syshead"><b>Check your email</b><span>We sent a sign-in link to <b>${esc(email)}</b>. It works for 15 minutes.</span></div>
+      <button class="btn primary wide" data-oauth-continue>Open the link <span class="tiny" style="font-weight:400;opacity:.8">(prototype)</span></button>
+      <button class="btn ghost wide" data-oauth="email">Use a different email</button>`}
+  </div></div></div>`;
+  setTimeout(()=>{ const f=document.getElementById('emailField'); if(f) f.focus(); },50);
+}
+function openOAuth(kind){
+  if(kind==='email') return openEmail();
+  const apple = kind==='apple';
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet sys"><div class="grab"></div>${sheetHdr('')}<div class="body" style="gap:8px;padding-top:0">
+    <div class="syshead"><b>${apple?'Sign in with Apple':'Choose an account'}</b><span>to continue to openRCP</span></div>
+    ${apple?`<div class="acct">${avatar({n:'Ben',c:'#1F1A14'})}<span class="txt"><b>Ben</b><span>Name shared with openRCP</span></span></div>
+      <div class="acct"><span class="txt"><b>Share my email</b><span>ben.cooks@icloud.com</span></span><span class="rchip on" style="padding:5px 10px 5px 8px"><i></i>Share</span></div>
+      <div class="acct" style="border-bottom:1px solid var(--line)"><span class="txt"><b>Hide my email</b><span>Apple relays mail from a private address</span></span><span class="rchip" style="padding:5px 10px 5px 8px"><i></i>Hide</span></div>
+      <button class="btn primary wide" data-oauth-continue style="margin-top:8px">Continue with Face ID</button>`
+    :`<button class="acct" data-oauth-continue>${avatar({n:'Ben',c:'#1F1A14'})}<span class="txt"><b>Ben</b><span>ben.cooks@gmail.com</span></span></button>
+      <button class="acct" data-oauth-continue>${avatar({n:'B W',c:'#7A4A2B'})}<span class="txt"><b>Ben (work)</b><span>ben@example.com</span></span></button>
+      <button class="acct" style="border-bottom:1px solid var(--line)"><span class="avatar" style="background:var(--cream);color:var(--fg)">+</span><span class="txt"><b>Use another account</b></span></button>`}
+    <p class="tiny muted" style="text-align:center;margin:6px 0 0">Simulated system sheet. ${apple?'Apple':'Google'} runs the real one and hands openRCP a name and email, nothing else.</p>
+  </div></div></div>`;
+}
+function openInvite(cid){
+  const c=cid?CONTACTS.find(x=>x.id===cid):null, handle=S.me.h.replace('@','');
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet"><div class="grab"></div>${sheetHdr(c?`Invite ${c.n.split(' ')[0]}`:'Share your invite link')}<div class="body">
+    <div class="small muted">${c?'Goes out as a text from your phone. Prefilled, editable.':'Text it, AirDrop it, or paste the link anywhere.'}</div>
+    <div class="bubble">I'm on openRCP. Come see what recipes I'm cooking 🍳<div class="linkcard"><div class="top"><span style="color:var(--green)">${ICON.logo}</span><span style="min-width:0"><b>${esc(S.me.n)} is on openRCP</b><span>openrcp.com/join/${esc(handle)} · one tap to join and follow</span></span></div></div></div>
+    <div class="two"><button class="btn primary" data-send-invite="${cid||'any'}">${c?'Send via Messages':'Share'}</button><button class="btn ghost" data-copy>Copy link</button></div>
+    <p class="tiny muted" style="margin:0">The link opens the app if installed, otherwise the App Store, and lands on ${esc(S.me.n)}'s profile with Follow preselected.</p>
+  </div></div></div>`;
+}
+const PASTE_SAMPLES=[['NYT Cooking','https://cooking.nytimes.com/recipes/1020330-shrimp-scampi-with-orzo'],['Smitten Kitchen','https://smittenkitchen.com/2016/04/sheet-pan-chicken-tikka/'],['Unknown site','https://example.com/dinner/lemon-chicken']];
+function openPaste(){
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet"><div class="grab"></div>${sheetHdr('Paste a link',{back:'reopen-log'})}<div class="body">
+    <div class="small muted">Any recipe page. openRCP reads the public title, author and photo, matches the catalog, and links back to the source.</div>
+    <input class="field" id="pasteUrl" placeholder="https://cooking.nytimes.com/recipes/…" autocomplete="off" inputmode="url">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="tiny muted">Try:</span>${PASTE_SAMPLES.map(([n,u])=>`<button class="chip" data-paste-fill="${u}">${n}</button>`).join('')}</div>
+    <div id="pasteStatus" class="small muted" style="min-height:20px"></div>
+    <button class="btn primary wide" data-paste-go>Find recipe</button>
+  </div></div></div>`;
+  setTimeout(()=>{ const i=document.getElementById('pasteUrl'); if(i) i.focus(); },50);
+}
+function resolveUrl(u){
+  let host=''; try{ host=new URL(u).hostname.replace(/^www\./,''); }catch(e){ return null; }
+  const bySrc={'cooking.nytimes.com':'nyt','smittenkitchen.com':'sk','seriouseats.com':'se','halfbakedharvest.com':'hbh','budgetbytes.com':'bb','bonappetit.com':'ba'};
+  const src=bySrc[host]; if(!src) return null;
+  const slug=u.toLowerCase().replace(/[^a-z0-9]+/g,' ');
+  const cands=RECIPES.filter(r=>r.s===src);
+  const scored=cands.map(r=>({r,n:r.t.toLowerCase().split(/[^a-z0-9]+/).filter(w=>w.length>3&&slug.includes(w)).length})).sort((a,b)=>b.n-a.n);
+  return (scored[0]&&scored[0].n>0?scored[0].r:cands[0]).id;
+}
+function shareDemo(kind){
+  S.demoKind=kind;
+  const nyt=kind==='nyt', r=R(nyt?'r5':'r13');
+  $overlay.innerHTML=`<div class="demo">
+    <div class="strip">${nyt?'NYT Cooking app':'Safari · smittenkitchen.com'} · simulated</div>
+    ${nyt?`<div class="page"><img class="ph" src="photos/r5.jpg" alt=""><h1>${esc(r.t)}</h1><div class="by">By ${esc(r.a)} · ${mins(r.m)} · ★★★★★ 2,431 ratings</div>
+      <div style="display:flex;gap:10px;margin:14px 0 18px"><span class="shrbtn">♡ Save</span><button class="shrbtn pulse" data-demo-step="sheet">${ICON.share}Share</button></div>
+      <div class="ln" style="width:94%"></div><div class="ln" style="width:82%"></div><div class="ln" style="width:90%"></div><div class="ln" style="width:58%"></div></div>`
+    :`<div class="page"><div class="urlbar">smittenkitchen.com</div><div class="ad">ad</div><h1 style="text-transform:lowercase;font-weight:400;font-size:22px">${esc(r.t)}</h1><div class="by">${esc(r.a)} · 60 minutes</div><img class="ph" src="photos/r13.jpg" alt="" style="margin-top:10px"><div class="ln" style="width:92%;margin-top:12px"></div><div class="ln" style="width:85%"></div><div class="ad">ad</div></div>
+      <div class="bar"><span>‹</span><span>›</span><button class="pulse" data-demo-step="sheet" aria-label="Share">${ICON.share}</button><span>▢</span><span>⧉</span></div>`}
+    <div class="coach" ${nyt?'':'style="bottom:84px"'}><b>1</b><span>Tap Share${nyt?' inside the NYT Cooking app':' in Safari, Chrome, Instagram, anywhere'}</span><button data-close>Cancel</button></div>
+  </div>`;
+}
+function demoSheet(kind){
+  const nyt=kind==='nyt', r=R(nyt?'r5':'r13'), s=SRC(r);
+  const apps=[['Messages','#34c759','💬'],['Mail','#1a73e8','✉'],['Notes','#f5c400','✎']];
+  const demo=document.querySelector('.demo'); if(!demo) return;
+  demo.insertAdjacentHTML('beforeend',`<div class="ios"><div class="sh">
+      <div class="prev"><img src="photos/${r.id}.jpg" alt=""><span style="min-width:0"><b>${esc(r.t)}</b><span>${s.url.replace('https://','')}</span></span></div>
+      <div class="apps">${apps.map(([n,c,g])=>`<span class="app"><i style="background:${c}">${g}</i>${n}</span>`).join('')}<button class="app rcp pulse" data-demo-step="rcp"><i>${ICON.logo}</i>openRCP</button><span class="app"><i style="background:#d0d0d4;color:#333">…</i>More</span></div>
+      <div class="acts"><button data-demo-step="rcp"><span>I made it · openRCP</span>${ICON.logo}</button><button><span>Copy</span>${ICON.link}</button><button><span>Add to Reading List</span>${ICON.book}</button></div>
+    </div></div>`);
+  const coach=demo.querySelector('.coach'); if(coach){ coach.style.bottom='18px'; coach.style.zIndex='27'; coach.innerHTML=`<b>2</b><span>openRCP shows up like any other app. Pick it, or the "I made it" action.</span><button data-close>Cancel</button>`; }
+}
+/* ---------- Taste test: a card in the feed, a sheet when started ---------- */
+function tasteBody(){
+  const deck=tasteDeck(), i=S.tasteIdx||0, liked=(S.taste||[]).length, done=i>=deck.length, keys=tasteKeys();
+  const card=(r,k)=>`<div class="tcard" data-tcard="${r.id}" style="z-index:${10-k};transform:translateY(${k*6}px) scale(${1-k*.03})">${tile(r,{cls:'wide'})}<div class="tbody"><b>${esc(r.t)}</b><span>${esc(SRC(r).name)}${SRC(r).type!=='cookbook'?' · '+mins(r.m):''}</span></div><span class="stamp yes">Cook it</span><span class="stamp no">Pass</span></div>`;
+  if(done) return `<div class="empty" style="padding-top:30px"><div class="avstack" style="justify-content:center">${(S.taste||[]).slice(0,5).map(id=>`<span class="avatar" style="padding:0;overflow:hidden;border:2px solid var(--bg)">${tile(R(id),{cls:'sm'}).replace('class="tile sm"','class="tile sm" style="width:34px;height:34px;border-radius:50%"')}</span>`).join('')}</div>
+    <h3>${liked?`You lean ${esc(keys.slice(0,3).join(', '))}`:'Nothing caught your eye'}</h3><p>${liked?`${liked} ${liked===1?'recipe':'recipes'} you'd cook. Trending is ranked with this in mind from now on.`:'No problem. We learn from what you log.'}</p>
+    <div class="two" style="width:100%"><button class="btn ghost" data-taste-reset>Do it again</button><button class="btn primary" data-close>Done</button></div></div>`;
+  return `<p class="small muted" style="margin:0 0 4px">Swipe right on anything you'd actually cook. ${deck.length} cards.</p>
+    <div class="deck" id="deck">${deck.slice(i,i+3).map((r,k)=>card(r,k)).reverse().join('')}</div>
+    <div class="tbtns"><button class="tbtn no" data-taste="no" aria-label="Pass">✕</button><span class="tiny muted">${i+1} / ${deck.length}</span><button class="tbtn yes" data-taste="yes" aria-label="Cook it">${ICON.check}</button></div>`;
+}
+function openTaste(){
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet" style="height:86%"><div class="grab"></div>${sheetHdr('Taste test')}<div class="body" id="tasteBody" style="overflow:hidden"></div></div></div>`;
+  const paint=()=>{ const el=document.getElementById('tasteBody'); if(!el) return; el.innerHTML=tasteBody(); bindDeck(); };
+  paint(); $overlay.paint=paint;
+}
+function tasteCard(){
+  const deck=tasteDeck().slice(0,3);
+  return `<article class="card tastecard">
+    <div class="who"><span class="srcmark lg" style="background:var(--green);color:var(--on-green)">${ICON.check.replace('<svg','<svg width="16" height="16"')}</span><span><b>Tune your feed</b> · 20 seconds</span><button class="x" data-taste-dismiss aria-label="Not now" style="margin-left:auto;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:var(--faint);font-size:12px">✕</button></div>
+    <button class="tstack" data-taste-open>${deck.map((r,i)=>`<span class="tcard mini" style="z-index:${3-i};transform:translateX(${(i-1)*44}px) rotate(${(i-1)*7}deg) scale(${1-Math.abs(i-1)*.06})">${tile(r)}</span>`).join('')}</button>
+    <div class="ttl">Swipe through 8 recipes</div><div class="src">We'll rank Trending by what you'd actually cook. Skippable, comes back in a month.</div>
+    <div class="two" style="margin-top:10px"><button class="btn primary" data-taste-open>Start</button><button class="btn ghost" data-taste-dismiss>Not now</button></div>
+  </article>`;
+}
+function bindDeck(){
+  const top=document.querySelector('#deck .tcard:last-child'); if(!top) return;
+  let sx=0, dx=0, dragging=false;
+  top.addEventListener('pointerdown',e=>{ dragging=true; sx=e.clientX; dx=0; top.setPointerCapture(e.pointerId); top.style.transition='none'; });
+  top.addEventListener('pointermove',e=>{ if(!dragging) return; dx=e.clientX-sx; top.style.transform=`translateX(${dx}px) rotate(${dx/18}deg)`; top.style.setProperty('--yes',Math.max(0,Math.min(1,dx/80))); top.style.setProperty('--no',Math.max(0,Math.min(1,-dx/80))); });
+  const end=()=>{ if(!dragging) return; dragging=false; if(Math.abs(dx)>90) fling(top,dx>0?'yes':'no'); else { top.style.transition='transform .2s'; top.style.transform=''; top.style.setProperty('--yes',0); top.style.setProperty('--no',0); } };
+  top.addEventListener('pointerup',end); top.addEventListener('pointercancel',end);
+}
+function fling(card,ans){ card.style.transition='transform .25s ease-in, opacity .25s'; card.style.setProperty(ans==='yes'?'--yes':'--no',1); card.style.transform=`translateX(${ans==='yes'?520:-520}px) rotate(${ans==='yes'?25:-25}deg)`; card.style.opacity='0'; setTimeout(()=>tasteAnswer(ans),230); }
+function tasteAnswer(ans){ const deck=tasteDeck(), i=S.tasteIdx||0, r=deck[i]; if(!r) return; if(ans==='yes'){ S.taste=S.taste||[]; if(!S.taste.includes(r.id)) S.taste.push(r.id); } S.tasteIdx=i+1; if(document.getElementById('tasteBody')&&$overlay.paint) $overlay.paint(); else render(); if(S.tasteIdx>=deck.length) render(); }
+/* ---------- Planning to cook ---------- */
+function openPlan(rid){
+  const r=R(rid), cur=plannedFor(rid), days=Object.keys(S.plan).filter(k=>S.plan[k].includes(rid)).map(k=>dayLabel(new Date(k+'T12:00').getTime()));
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet"><div class="grab"></div>${sheetHdr('Plan a day')}<div class="body">
+    <div class="rhead">${tile(r,{cls:'md'})}<div class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span>${cur?`<i>Planned: ${esc(days.join(', '))}</i>`:''}</div></div>
+    <div class="dietgrid" style="grid-template-columns:repeat(4,1fr);padding:0">${weekDays().map(d=>{ const on=planOf(d.key).includes(rid), full=!on&&planOf(d.key).length>=PLAN_MAX; return `<button class="diet ${on?'on':''}" data-plan-toggle="${d.key}" data-plan-rid="${rid}" ${full?'disabled':''} style="flex-direction:column;gap:2px;padding:10px 6px;text-align:center;align-items:center"><span style="font-size:13px;font-weight:600">${d.label}</span><span class="tiny muted">${full?'full':planOf(d.key).length?planOf(d.key).length+' planned':d.date}</span></button>`; }).join('')}</div>
+    <div class="two">${cur?`<button class="btn ghost" data-plan-clear="${rid}">Clear</button>`:'<span></span>'}<button class="btn secondary" data-close>Done</button></div>
+    <p class="tiny muted" style="margin:0">Up to ${PLAN_MAX} recipes a day. They show in My Kitchen and nudge you that morning; logging one clears it.</p>
+  </div></div></div>`;
+}
+function openPlanPick(key){
+  const label=dayLabel(new Date(key+'T12:00').getTime());
+  S.planSel=[...planOf(key)];
+  const pool=[...new Set([...S.wants, ...myCooks().sort((a,b)=>b.t-a.t).map(c=>c.r)])].map(R).filter(Boolean);
+  const row=r=>{ const on=S.planSel.includes(r.id), full=!on&&S.planSel.length>=PLAN_MAX; return `<button class="rrow ${on?'sel':''}" data-plan-toggle-sel="${r.id}" ${full?'disabled':''} role="checkbox" aria-checked="${on}">${tile(r,{cls:'sm'})}<span class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span></span><span class="chk">${ICON.check}</span></button>`; };
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet" style="height:86%"><div class="grab"></div>${sheetHdr(`Cook on ${label}`)}<div class="body" style="padding:0;gap:0;flex:1;min-height:0">
+    <div class="pad" style="padding-bottom:8px"><label class="search">${ICON.search}<input id="planSearch" placeholder="Search any recipe" autocomplete="off"></label></div>
+    <div style="flex:1;min-height:0;overflow-y:auto"><div id="planResults"></div>
+    <div id="planQuick"><div class="label" style="padding:6px 18px">Want to cook and recent</div><div class="list" id="planPool">${pool.map(row).join('')||'<div class="pad small muted">Nothing saved yet. Search above.</div>'}</div></div></div>
+    <div class="obfoot" id="planFoot" style="margin:0;padding:12px 18px calc(16px + env(safe-area-inset-bottom,0px))"></div>
+  </div></div></div>`;
+  const foot=()=>{ const n=S.planSel.length; document.getElementById('planFoot').innerHTML=`<button class="btn primary wide" data-plan-confirm="${key}">${n?`Plan ${n} for ${esc(label)}`:'Pick up to 4'}</button><div class="tiny muted" style="text-align:center">${n} of ${PLAN_MAX}</div>`; };
+  const repaint=()=>{ const pp=document.getElementById('planPool'); if(pp) pp.innerHTML=pool.map(row).join(''); const inp=document.getElementById('planSearch'); if(inp&&inp.value.trim()) search(inp.value); foot(); };
+  const search=q=>{ const el=document.getElementById('planResults'), quick=document.getElementById('planQuick'); if(!q.trim()){ el.innerHTML=''; quick.hidden=false; return; } quick.hidden=true; el.innerHTML=`<div class="list">${catalogSearch(q,'all',8).map(row).join('')}</div>`; };
+  document.getElementById('planSearch').addEventListener('input',e=>search(e.target.value));
+  $overlay.repaint=repaint; foot();
+}
+function openFriendDay(uid,key){
+  const u=U(uid), first=u.n.split(' ')[0], label=dayLabel(new Date(key+'T12:00').getTime());
+  const rids=((S.fplan||{})[uid]||[]).filter(pl=>pl.key===key).map(pl=>pl.r);
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet"><div class="grab"></div>${sheetHdr(`${first} · ${label}`)}<div class="body">
+    <div class="list" style="margin:0 -18px">${rids.map(rid=>{ const r=R(rid); return `<button class="rrow" data-recipe="${rid}">${tile(r,{cls:'sm'})}<span class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span></span>${ICON.chev}</button>`; }).join('')}</div>
+    <button class="btn ghost wide" data-close>Done</button>
+  </div></div></div>`;
+}
+function openPlanDay(key){
+  const rids=planOf(key), label=dayLabel(new Date(key+'T12:00').getTime());
+  $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet"><div class="grab"></div>${sheetHdr(label)}<div class="body">
+    <div class="list" style="margin:0 -18px">${rids.map(rid=>{ const r=R(rid); return `<div class="rrow" style="padding-right:12px"><button data-recipe="${rid}" style="display:contents">${tile(r,{cls:'sm'})}<span class="txt"><b>${esc(r.t)}</b><span>${srcLine(r)}</span></span></button><button class="btn sm secondary" data-madeit="${rid}">Made it</button><button class="x" data-plan-remove="${rid}" data-plan-key="${key}" aria-label="Remove" style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:var(--faint)">✕</button></div>`; }).join('')}</div>
+    <div class="two">${rids.length<PLAN_MAX?`<button class="btn secondary" data-plan-pick="${key}">Add another</button>`:'<span class="small muted" style="align-self:center">Day is full</span>'}<button class="btn ghost" data-close>Done</button></div>
+  </div></div></div>`;
+}
+function setSynth(on){
+  const ids=SYNTH_NAMES.map((_,i)=>'s'+i);
+  S.synth=on; S.cooks=S.cooks.filter(c=>!c.synth); S.following=S.following.filter(id=>!ids.includes(id));
+  if(on){
+    if(!USERS.some(u=>u.synth)) SYNTH_NAMES.forEach((n,i)=>USERS.push({id:'s'+i,n,h:'@'+n.toLowerCase().replace(/\s+/g,'.'),c:['#6B6560','#7A6A58','#5E6B62','#6A5E70'][i%4],bio:'',synth:true}));
+    let seed=11; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
+    const pool=RECIPES.filter(r=>cover(r)||SRC(r).type==='cookbook');
+    ids.forEach((id,i)=>{ const k=1+Math.floor(rnd()*3); for(let j=0;j<k;j++){ const r=pool[Math.floor(rnd()*pool.length)]; S.cooks.push({id:'sc'+i+'_'+j,u:id,r:r.id,t:now-Math.floor(rnd()*7*DAY),p:rnd()>0.45,rt:rnd()>0.3?3+Math.round(rnd()*2):0,n:'',vis:'friends',synth:true}); } S.following.push(id); });
+  }
+  render();
+}
+function logIt(){
+  const c={id:'c'+Date.now(),u:'me',r:draft.r,t:draft.t,p:draft.p,rt:draft.rt,n:draft.n.trim(),vis:draft.vis};
+  S.cooks.push(c); S.lastVis=draft.vis; S.wants=S.wants.filter(x=>x!==draft.r);
+  planRemove(draft.r);
+  const n=myCooks(draft.r).length;
+  closeOverlay();
+  if(!S.onboarded){ S.onboarded=true; S.tab='diary'; S.stack=[]; }
+  render();
+  toast('Logged', n===1?"First time you've made this":`That's your ${n}${n===2?'nd':n===3?'rd':'th'} time`);
+}
+function pushNotif(){
+  const week = friendCooks().filter(c=>now-c.t<7*DAY).length;
+  const el=document.createElement('button'); el.className='push';
+  el.innerHTML=`<span class="ic">${ICON.logo}</span><span><b>openRCP</b><span>Your friends cooked ${week} things this week</span></span><small>now</small>`;
+  el.addEventListener('click',()=>{ el.remove(); S.stack=[]; go('notifs'); });
+  document.getElementById('phone').appendChild(el); setTimeout(()=>{ if(el.isConnected) el.remove(); },6000);
+}
+
+/* ---------- Events ---------- */
+document.getElementById('phone').addEventListener('click',e=>{
+  const t = e.target.closest('[data-tab],[data-go],[data-back],[data-recipe],[data-cook],[data-user],[data-like],[data-want],[data-follow],[data-madeit],[data-reader],[data-diary],[data-filter],[data-ob],[data-contacts],[data-close],[data-photo],[data-rate],[data-vis],[data-daytoggle],[data-logit],[data-share-made],[data-share-want],[data-paste],[data-addname],[data-open-log],[data-del],[data-more],[data-del-confirm],[data-oauth],[data-oauth-continue],[data-obsrc],[data-pick],[data-logmulti],[data-invite-user],[data-send-invite],[data-copy],[data-paste-go],[data-paste-fill],[data-logsrc],[data-demo-step],[data-tag],[data-sig],[data-dismiss-callout],[data-reopen-log],[data-follows],[data-np],[data-datepick],[data-setday],[data-diet],[data-taste],[data-taste-reset],[data-plan],[data-plan-pick],[data-plan-day],[data-plan-clear],[data-taste-open],[data-taste-dismiss],[data-plan-toggle],[data-plan-toggle-sel],[data-plan-confirm],[data-plan-remove],[data-user-tab],[data-friend-day],[data-email-send]');
+  if(!t) return;
+  const ds=t.dataset;
+  if(ds.tag!==undefined){ S.exploreQ=(S.exploreQ||'').toLowerCase()===ds.tag.toLowerCase()?'':ds.tag; render(); return; }
+  if(ds.sig){ S.exploreSig=ds.sig; render(); return; }
+  if('dismissCallout' in ds){ S.calloutDismissed=true; render(); return; }
+  if('reopenLog' in ds){ openLog(); return; }
+  if(ds.follows){ const cur=S.stack[S.stack.length-1]; if(cur==='follows'){ S.followsTab=ds.follows; render(); } else go('follows',{followsTab:ds.follows,followsUser:ds.followsUser}); return; }
+  if(ds.np){ S.np=S.np||{}; S.np[ds.np]=ds.npVal==='1'; render(); return; }
+  if('close' in ds){ if(e.target===t||t.tagName==='BUTTON') closeOverlay(); return; }
+  if(ds.oauth){ openOAuth(ds.oauth); return; }
+  if('emailSend' in ds){ const f=document.getElementById('emailField'); const v=(f&&f.value.trim())||''; if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){ if(f){ f.focus(); f.style.outline='2px solid var(--danger)'; } return; } openEmail('sent',v); return; }
+  if('oauthContinue' in ds){ closeOverlay(); obStep=2; render(); toast('Signed in','Name and email came from the account'); return; }
+  if(ds.obsrc){ S.obSrc=ds.obsrc; render(); return; }
+  if(ds.pick){ const p=S.obPicked||(S.obPicked=[]); const i=p.indexOf(ds.pick); i<0?p.push(ds.pick):p.splice(i,1); const el=document.getElementById('obResults'); if(el) el.innerHTML=obRows(); const f=document.getElementById('obFoot'); if(f) f.firstElementChild.outerHTML=obFootBtn(); return; }
+  if('logmulti' in ds){ const ids=S.obPicked||[]; if(!ids.length) return; ids.forEach((id,i)=>S.cooks.push({id:'c'+Date.now()+i,u:'me',r:id,t:now-i*DAY-36e5,p:false,rt:0,n:'',vis:'friends'})); S.wants=S.wants.filter(x=>!ids.includes(x)); S.onboarded=true; S.tab='diary'; S.stack=[]; S.obPicked=[]; render(); toast(`${ids.length} ${ids.length===1?'cook':'cooks'} logged`,'Add a photo, rating or note any time from My Kitchen'); return; }
+  if(ds.inviteUser){ openInvite(ds.inviteUser==='any'?null:ds.inviteUser); return; }
+  if(ds.sendInvite){ const c=CONTACTS.find(x=>x.id===ds.sendInvite); if(c&&!S.invited.includes(c.id)) S.invited.push(c.id); closeOverlay(); render(); toast(c?'Invite sent':'Ready to share', c?`${c.n.split(' ')[0]} gets a text with your link`:'openrcp.com/join/'+S.me.h.replace('@','')); return; }
+  if('copy' in ds){ toast('Link copied','openrcp.com/join/'+S.me.h.replace('@','')); return; }
+  if(ds.pasteFill!==undefined){ const i=document.getElementById('pasteUrl'); if(i){ i.value=ds.pasteFill; i.focus(); } return; }
+  if('pasteGo' in ds){ const i=document.getElementById('pasteUrl'), st=document.getElementById('pasteStatus'); const u=(i&&i.value.trim())||''; if(!u){ st.textContent='Paste a URL first.'; return; } st.innerHTML='Reading the page… <span class="tiny">og:title · author · og:image · schema.org/Recipe</span>'; t.disabled=true; setTimeout(()=>{ const rid=resolveUrl(u); if(rid) openShare(rid,{via:'paste'}); else openShare(null,{unresolved:true,url:u,via:'paste'}); },800); return; }
+  if(ds.logsrc){ S.logSrc=ds.logsrc; const c=document.getElementById('logSrcChips'); if(c) c.innerHTML=srcChips(S.logSrc,'logsrc',LOG_CHIP_STYLE); paintLog(); return; }
+  if(ds.demoStep){ if(ds.demoStep==='sheet'){ demoSheet(S.demoKind); return; } const rid=S.demoKind==='nyt'?'r5':'r13'; closeOverlay(); if(!S.onboarded){ S.onboarded=true; S.tab='feed'; S.stack=[]; render(); } openShare(rid,{coach:"openRCP's share extension opens over the source app. Title, author and photo came from the link. Nothing to type."}); return; }
+  if(ds.tab){ setTab(ds.tab); return; }
+  if(ds.go){ go(ds.go); return; }
+  if('back' in ds){ back(); return; }
+  if(ds.recipe){ closeOverlay(); go('recipe',{viewRecipe:ds.recipe}); return; }
+  if(ds.cook){ go('cook',{viewCook:ds.cook}); return; }
+  if(ds.user){ go('user',{viewUser:ds.user}); return; }
+  if(ds.reader){ go('reader',{viewRecipe:ds.reader}); return; }
+  if(ds.like){ S.likes.includes(ds.like)?S.likes=S.likes.filter(x=>x!==ds.like):S.likes.push(ds.like); render(); return; }
+  if(ds.want){ const on=S.wants.includes(ds.want); S.wants=on?S.wants.filter(x=>x!==ds.want):[...S.wants,ds.want]; render(); toast(on?'Removed from want list':'Saved to want to cook'); return; }
+  if(ds.follow){ const on=S.following.includes(ds.follow); S.following=on?S.following.filter(x=>x!==ds.follow):[...S.following,ds.follow]; const sc=document.querySelector('.obscroll'), st=sc?sc.scrollTop:0; render(); const sc2=document.querySelector('.obscroll'); if(sc2) sc2.scrollTop=st; return; }
+  if(ds.diary){ S.diaryTab=ds.diary; render(); return; }
+  if(ds.userTab){ S.userTab=ds.userTab; render(); return; }
+  if(ds.friendDay){ openFriendDay(ds.friend,ds.friendDay); return; }
+  if('filter' in ds){ S.exploreFilter=ds.filter||null; render(); return; }
+  if(ds.madeit){ openMade(ds.madeit,{fromLog:!!document.getElementById('logSearch')}); return; }
+  if('openLog' in ds){ openLog(); return; }
+  if('paste' in ds){ openPaste(); return; }
+  if(ds.addname!==undefined){ const nr={id:'u'+Date.now(),t:ds.addname.replace(/^./,c=>c.toUpperCase()),a:'You',s:'sbk',m:0,em:'🍽️',h:30,net:0,avg:0}; RECIPES.push(nr); SOURCES.sbk.name='Your recipes'; openMade(nr.id); return; }
+  if(ds.ob){ if(ds.ob==='done'){ S.onboarded=true; S.tab='feed'; render(); return; } if(obStep===2){ const n=document.getElementById('obName'); const h=document.getElementById('obHandle'); if(n&&n.value.trim()) S.me.n=n.value.trim(); if(h&&h.value.trim()) S.me.h=h.value.trim(); } obStep=+ds.ob; render(); return; }
+  if('contacts' in ds){ if(!S.obContacts){ S.obContacts=true; render(); toast('Contacts matched on device','6 friends found, 3 to invite'); } return; }
+  if('photo' in ds){ draft.p=!draft.p||true; $overlay.paint(); return; }
+  if(ds.rate){ draft.rt=+ds.rate===draft.rt?0:+ds.rate; $overlay.paint(); return; }
+  if(ds.vis){ draft.vis=ds.vis; $overlay.paint(); return; }
+  if('datepick' in ds){ draft.pick=!draft.pick; $overlay.paint(); return; }
+  if(ds.setday!==undefined){ draft.t=now-(+ds.setday)*DAY; draft.pick=false; $overlay.paint(); return; }
+  if(ds.diet){ S.diet=S.diet||[]; if(ds.diet==='none') S.diet=[]; else { const i=S.diet.indexOf(ds.diet); i<0?S.diet.push(ds.diet):S.diet.splice(i,1); } S.taste=[]; S.tasteIdx=0; render(); return; }
+  if(ds.taste){ const top=document.querySelector('#deck .tcard:last-child'); if(top) fling(top,ds.taste); else tasteAnswer(ds.taste); return; }
+  if('tasteReset' in ds){ S.taste=[]; S.tasteIdx=0; if(document.getElementById('tasteBody')&&$overlay.paint) $overlay.paint(); else render(); return; }
+  if('tasteOpen' in ds){ openTaste(); return; }
+  if('tasteDismiss' in ds){ S.tasteDismissed=true; render(); return; }
+  if(ds.plan){ openPlan(ds.plan); return; }
+  if(ds.planPick){ openPlanPick(ds.planPick); return; }
+  if(ds.planDay){ openPlanDay(ds.planDay); return; }
+  if(ds.planToggle){ const k=ds.planToggle, rid=ds.planRid, arr=planOf(k); const i=arr.indexOf(rid); if(i>=0) arr.splice(i,1); else if(arr.length<PLAN_MAX) arr.push(rid); if(arr.length) S.plan[k]=arr; else delete S.plan[k]; openPlan(rid); return; }
+  if(ds.planToggleSel){ const rid=ds.planToggleSel, i=S.planSel.indexOf(rid); if(i>=0) S.planSel.splice(i,1); else if(S.planSel.length<PLAN_MAX) S.planSel.push(rid); if($overlay.repaint) $overlay.repaint(); return; }
+  if(ds.planConfirm){ const k=ds.planConfirm; if(S.planSel.length) S.plan[k]=[...S.planSel]; else delete S.plan[k]; closeOverlay(); render(); toast(`${S.planSel.length} planned for ${dayLabel(new Date(k+'T12:00').getTime())}`); return; }
+  if(ds.planRemove){ const k=ds.planKey; S.plan[k]=planOf(k).filter(x=>x!==ds.planRemove); if(!S.plan[k].length){ delete S.plan[k]; closeOverlay(); render(); } else { openPlanDay(k); render(); } return; }
+  if(ds.planClear){ planRemove(ds.planClear); closeOverlay(); render(); toast('Plan cleared'); return; }
+  if('logit' in ds){ logIt(); return; }
+  if('shareMade' in ds){ let rid=ds.shareMade; if(!rid){ const t2=document.getElementById('shareTitle'); const nr={id:'u'+Date.now(),t:(t2&&t2.value.trim())||'Untitled recipe',a:'Unknown',s:'sbk',m:0,em:'🍽️',h:30,net:0,avg:0}; RECIPES.push(nr); rid=nr.id; }
+    const body=document.getElementById('shareBody'); body.id='madeBody'; openMade(rid,{fromShare:true}); return; }
+  if('shareWant' in ds){ let rid=ds.shareWant; if(!rid){ const t2=document.getElementById('shareTitle'); const nr={id:'u'+Date.now(),t:(t2&&t2.value.trim())||'Untitled recipe',a:'Unknown',s:'sbk',m:0,em:'🍽️',h:30,net:0,avg:0}; RECIPES.push(nr); rid=nr.id; } if(!S.wants.includes(rid)) S.wants.push(rid); closeOverlay(); render(); toast('Saved to want to cook'); return; }
+  if(ds.del){ t.textContent='Tap again to delete'; t.dataset.delConfirm=ds.del; delete t.dataset.del; return; }
+  if(ds.delConfirm){ S.cooks=S.cooks.filter(c=>c.id!==ds.delConfirm); back(); toast('Deleted'); return; }
+  if(ds.more){ toast('View original · Report a problem','Overflow menu, not built in the prototype'); return; }
+});
+document.getElementById('plusBtn').addEventListener('click',openLog);
+document.getElementById('ctlShareNyt').addEventListener('click',()=>shareDemo('nyt'));
+document.getElementById('ctlShareBlog').addEventListener('click',()=>shareDemo('blog'));
+document.getElementById('ctlSynth').addEventListener('change',e=>setSynth(e.target.checked));
+document.getElementById('ctlDigest').addEventListener('click',()=>{ if(!S.onboarded){S.onboarded=true;render();} pushNotif(); });
+document.getElementById('ctlOnboard').addEventListener('click',()=>{ obStep=1; freshState(false); S.cooks=S.cooks.filter(c=>c.u!=='me'); render(); });
+document.getElementById('ctlReset').addEventListener('click',()=>{ freshState(true); render(); toast('Reset'); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeOverlay(); });
+
+/* ---------- Boot ---------- */
+const startOnboarding = location.hash==='#onboarding';
+freshState(!startOnboarding);
+if(startOnboarding){ S.cooks=S.cooks.filter(c=>c.u!=='me'); }
+render();
+window.addEventListener('hashchange',()=>{ if(location.hash==='#onboarding'){ obStep=1; freshState(false); S.cooks=S.cooks.filter(c=>c.u!=='me'); render(); } });
+</script>
+
+</body>
+</html>
