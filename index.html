@@ -270,6 +270,14 @@ h1,h2,h3{margin:0;font-weight:500;text-wrap:balance}
 .obhdr .back{display:flex;align-items:center;gap:2px;color:var(--muted);font-size:14px;margin-left:-6px}
 .obscroll{flex:1;min-height:0;overflow-y:auto;margin:0 -22px;padding:0 22px}
 .obfoot{display:flex;flex-direction:column;gap:8px;margin:0 -22px;padding:12px 22px calc(16px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
+.phrow{display:flex;gap:8px;align-items:center}
+.phrow .cc{background:var(--cream);border-radius:10px;padding:11px 13px;font-size:15px;color:var(--muted)}
+.codefield{font-size:24px;letter-spacing:.35em;text-align:center;font-variant-numeric:tabular-nums}
+.phverified{display:flex;gap:12px;align-items:center;background:var(--cream);border-radius:12px;padding:14px}
+.phverified>svg{width:22px;height:22px;flex:none}
+.phverified>span{flex:1;display:flex;flex-direction:column;font-size:15px}
+.phverified>span span{font-size:13px;color:var(--muted)}
+.obwrap .link,.phverified .link{background:none;border:0;padding:0;font:inherit;color:var(--fg);text-decoration:underline;cursor:pointer}
 .obfoot .skip{font-size:14px;color:var(--muted);padding:4px}
 .btn[disabled]{opacity:.45;pointer-events:none}
 /* Radio chips (source picker) */
@@ -454,7 +462,7 @@ a.method{color:inherit;text-decoration:none}
     <label class="ctlrow"><input type="checkbox" id="ctlSynth"> Seed feed with 20 synthetic cooks</label>
     <div class="flows">
       <span class="label">Flows to try</span>
-      <div><b>A</b> Restart → sign in → what you eat → friends → tick what you cooked → My Kitchen</div>
+      <div><b>A</b> Restart → sign in → handle → verify phone → what you eat → friends → tick what you cooked → My Kitchen</div>
       <div><b>H</b> Feed → "Tune your feed" card (3rd slot) → swipe 8 → Trending re-ranks</div>
       <div><b>G</b> My Kitchen → Planning to cook → tap a day → tick up to 4 → Made it clears one</div>
       <div><b>B</b> Share from NYT → share sheet → openRCP → Log it → Feed</div>
@@ -937,9 +945,9 @@ views.reader = () => {
 
 /* ---------- Onboarding ---------- */
 let obStep=1;
-// Onboarding after sign-in: 2 handle · 3 what you eat · 4 friends · 5 first log. The taste test lives in the feed.
-const OB_LAST=5;
-const obDots = () => `<div class="dots">${[2,3,4,5].map(i=>`<i class="${i===obStep?'on':''}"></i>`).join('')}</div>`;
+// Onboarding after sign-in: 2 handle · 3 phone (required, verified by text) · 4 what you eat · 5 friends · 6 first log. The taste test lives in the feed.
+const OB_LAST=6;
+const obDots = () => `<div class="dots">${[2,3,4,5,6].map(i=>`<i class="${i===obStep?'on':''}"></i>`).join('')}</div>`;
 const obHdr = backTo => `<div class="obhdr">${backTo?`<button class="back" data-ob="${backTo}">${ICON.back}Back</button>`:'<span></span>'}<span class="tiny muted">${obStep-1} of ${OB_LAST-1}</span></div>`;
 // Dietary restrictions: tap what applies. Each carries the keywords it rules out, so the feed and the taste deck respect it immediately.
 const DIETS=[['vegetarian','🥦','Vegetarian',['chicken','seafood','fish','shrimp','roast']],['vegan','🌱','Vegan',['chicken','seafood','fish','shrimp','roast','pizza']],['pescatarian','🐟','Pescatarian',['chicken','roast']],['glutenfree','🌾','Gluten-free',['pasta','noodles','pizza']],['dairyfree','🥛','Dairy-free',[]],['nuts','🥜','Nut allergy',[]],['shellfish','🦐','No shellfish',['shrimp','seafood']],['pork','🐖','No pork',[]],['halal','🕌','Halal',[]],['kosher','✡️','Kosher',['shrimp','seafood']],['lowcarb','🥩','Low-carb',['pasta','noodles','pizza','rice','potatoes']]];
@@ -991,25 +999,38 @@ views.onboard = () => {
     <div style="display:flex;gap:12px;align-items:center">${avatar({n:S.me.n,c:'#01281A'},'lg')}<div style="flex:1;display:flex;flex-direction:column;gap:8px"><input class="field" id="obName" value="${esc(S.me.n)}" placeholder="Your name"><input class="field" id="obHandle" value="${esc(S.me.h)}" placeholder="@yourname"></div></div>
     <div class="spacer"></div><div class="obfoot"><button class="btn primary wide" data-ob="3">Continue</button>${obDots()}</div></div>`;
   if(obStep===3){
+    const ph=S.obPhone||{};
+    if(ph.ok) return `<div class="obwrap">${obHdr(2)}<h1>Your cell number</h1><p>Verified. We'll use it to confirm it's you.</p>
+      <div class="phverified">${ICON.check||'✓'}<span><b>${esc(ph.n)}</b><span>Verified by text</span></span><button class="link" data-phone-change>Change</button></div>
+      <div class="spacer"></div><div class="obfoot"><button class="btn primary wide" data-ob="4">Continue</button>${obDots()}</div></div>`;
+    if(ph.sent) return `<div class="obwrap">${obHdr(2)}<h1>Enter the code</h1><p>We texted a 6-digit code to ${esc(ph.n)}. <button class="link" data-phone-change>Change number</button></p>
+      <input class="field codefield" id="obCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="${esc(ph.typed||'')}">
+      <button class="link" data-phone-resend style="align-self:flex-start;margin-top:12px">Resend code</button>
+      <div class="spacer"></div><div class="obfoot"><button class="btn primary wide" data-phone-verify>Verify</button>${obDots()}</div></div>`;
+    return `<div class="obwrap">${obHdr(2)}<h1>What's your cell number?</h1><p>We'll text you a code to confirm it's yours. Message and data rates may apply.</p>
+      <div class="phrow"><span class="cc">+1</span><input class="field" id="obPhone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(555) 123-4567" value="${esc(ph.n||'')}"></div>
+      <div class="spacer"></div><div class="obfoot"><button class="btn primary wide" data-phone-send>Text me a code</button>${obDots()}</div></div>`;
+  }
+  if(obStep===4){
     const diet=S.diet||[];
-    return `<div class="obwrap">${obHdr(2)}<h1>Tell us more about your dietary preferences</h1><p>Tap what applies. Friends never see this; it only tunes what we show you.</p>
+    return `<div class="obwrap">${obHdr(3)}<h1>Tell us more about your dietary preferences</h1><p>Tap what applies. Friends never see this; it only tunes what we show you.</p>
       <div class="obscroll"><div class="dietgrid">
         <button class="diet ${diet.length?'':'on'}" data-diet="none">${dietBadge('all')}<span>I eat everything</span></button>
         ${DIETS.map(([k,e,n])=>`<button class="diet ${diet.includes(k)?'on':''}" data-diet="${k}">${dietBadge(k)}<span>${n}</span></button>`).join('')}
       </div></div>
-      <div class="obfoot"><button class="btn primary wide" data-ob="4">${diet.length?`Continue · ${diet.length} noted`:'Continue'}</button>${obDots()}</div></div>`;
+      <div class="obfoot"><button class="btn primary wide" data-ob="5">${diet.length?`Continue · ${diet.length} noted`:'Continue'}</button>${obDots()}</div></div>`;
   }
-  if(obStep===4){
+  if(obStep===5){
     const on=USERS.filter(u=>u.id!=='me'&&!u.synth), nf=S.following.length;
-    return `<div class="obwrap">${obHdr(3)}<h1>Find your friends</h1><p>openRCP is better with people you actually eat with.</p>
+    return `<div class="obwrap">${obHdr(4)}<h1>Find your friends</h1><p>openRCP is better with people you actually eat with.</p>
       <div class="obscroll">${syncRow()}${inviteCard()}
         ${S.obContacts?`<div class="row-h" style="padding:16px 0 4px"><h3 class="h-sec" style="font-size:15px">On openRCP</h3><span class="tiny muted">${on.length} of ${on.length+CONTACTS.length} contacts</span></div>${on.map(frowFollow).join('')}
         <div class="row-h" style="padding:18px 0 4px"><h3 class="h-sec" style="font-size:15px">Invite</h3><span class="tiny muted">${CONTACTS.length} not on openRCP yet</span></div>${CONTACTS.map(frowInvite).join('')}<div style="height:12px"></div>`:''}
       </div>
-      <div class="obfoot"><button class="btn primary wide" data-ob="5">${nf?`Continue · following ${nf}`:'Skip for now'}</button>${obDots()}</div></div>`;
+      <div class="obfoot"><button class="btn primary wide" data-ob="6">${nf?`Continue · following ${nf}`:'Skip for now'}</button>${obDots()}</div></div>`;
   }
   const src=S.obSrc||'all';
-  return `<div class="obwrap">${obHdr(4)}<h1>Log something you cooked this week</h1><p>Pick a source, search, tick everything you made.</p>
+  return `<div class="obwrap">${obHdr(5)}<h1>Log something you cooked this week</h1><p>Pick a source, search, tick everything you made.</p>
     ${srcChips(src,'obsrc')}
     <label class="search" style="margin-top:8px">${ICON.search}<input id="obSearch" placeholder="${src==='all'?'Search any recipe':'Search '+esc(srcLabel(src))}" autocomplete="off"></label>
     <div class="obscroll" id="obResults">${obRows()}</div>
@@ -1294,6 +1315,15 @@ function logIt(){
   render();
   toast('Logged', n===1?"First time you've made this":`That's your ${n}${n===2?'nd':n===3?'rd':'th'} time`);
 }
+function smsCode(){ return String(Math.floor(100000+Math.random()*900000)); }
+// Simulated incoming text. Tapping it fills the code, like the iOS/Android one-time-code autofill.
+function smsNotif(code){
+  document.querySelectorAll('#phone .push.sms').forEach(e=>e.remove());
+  const el=document.createElement('button'); el.className='push sms';
+  el.innerHTML=`<span class="ic">${ICON.logo}</span><span><b>Messages</b><span>Your openRCP code is ${code}</span></span><small>now</small>`;
+  el.addEventListener('click',()=>{ el.remove(); const f=document.getElementById('obCode'); if(f){ f.value=code; S.obPhone.typed=code; } });
+  document.getElementById('phone').appendChild(el); setTimeout(()=>{ if(el.isConnected) el.remove(); },8000);
+}
 function pushNotif(){
   const week = friendCooks().filter(c=>now-c.t<7*DAY).length;
   const el=document.createElement('button'); el.className='push';
@@ -1304,7 +1334,7 @@ function pushNotif(){
 
 /* ---------- Events ---------- */
 document.getElementById('phone').addEventListener('click',e=>{
-  const t = e.target.closest('[data-tab],[data-go],[data-back],[data-recipe],[data-cook],[data-user],[data-like],[data-want],[data-follow],[data-madeit],[data-reader],[data-diary],[data-filter],[data-ob],[data-contacts],[data-close],[data-photo],[data-rate],[data-vis],[data-daytoggle],[data-logit],[data-share-made],[data-share-want],[data-paste],[data-addname],[data-open-log],[data-del],[data-more],[data-del-confirm],[data-oauth],[data-oauth-continue],[data-obsrc],[data-pick],[data-logmulti],[data-invite-user],[data-send-invite],[data-copy],[data-paste-go],[data-paste-fill],[data-logsrc],[data-demo-step],[data-tag],[data-sig],[data-dismiss-callout],[data-reopen-log],[data-follows],[data-np],[data-datepick],[data-setday],[data-diet],[data-taste],[data-taste-reset],[data-plan],[data-plan-pick],[data-plan-day],[data-plan-clear],[data-taste-open],[data-taste-dismiss],[data-plan-toggle],[data-plan-toggle-sel],[data-plan-confirm],[data-plan-remove],[data-user-tab],[data-friend-day],[data-email-send]');
+  const t = e.target.closest('[data-tab],[data-go],[data-back],[data-recipe],[data-cook],[data-user],[data-like],[data-want],[data-follow],[data-madeit],[data-reader],[data-diary],[data-filter],[data-ob],[data-contacts],[data-close],[data-photo],[data-rate],[data-vis],[data-daytoggle],[data-logit],[data-share-made],[data-share-want],[data-paste],[data-addname],[data-open-log],[data-del],[data-more],[data-del-confirm],[data-oauth],[data-oauth-continue],[data-phone-send],[data-phone-verify],[data-phone-resend],[data-phone-change],[data-obsrc],[data-pick],[data-logmulti],[data-invite-user],[data-send-invite],[data-copy],[data-paste-go],[data-paste-fill],[data-logsrc],[data-demo-step],[data-tag],[data-sig],[data-dismiss-callout],[data-reopen-log],[data-follows],[data-np],[data-datepick],[data-setday],[data-diet],[data-taste],[data-taste-reset],[data-plan],[data-plan-pick],[data-plan-day],[data-plan-clear],[data-taste-open],[data-taste-dismiss],[data-plan-toggle],[data-plan-toggle-sel],[data-plan-confirm],[data-plan-remove],[data-user-tab],[data-friend-day],[data-email-send]');
   if(!t) return;
   const ds=t.dataset;
   if(ds.tag!==undefined){ S.exploreQ=(S.exploreQ||'').toLowerCase()===ds.tag.toLowerCase()?'':ds.tag; render(); return; }
@@ -1345,6 +1375,10 @@ document.getElementById('phone').addEventListener('click',e=>{
   if('openLog' in ds){ openLog(); return; }
   if('paste' in ds){ openPaste(); return; }
   if(ds.addname!==undefined){ const nr={id:'u'+Date.now(),t:ds.addname.replace(/^./,c=>c.toUpperCase()),a:'You',s:'sbk',m:0,em:'🍽️',h:30,net:0,avg:0}; RECIPES.push(nr); SOURCES.sbk.name='Your recipes'; openMade(nr.id); return; }
+  if('phoneSend' in ds){ const v=(document.getElementById('obPhone')||{}).value||''; const d=v.replace(/\D/g,'').replace(/^1(?=\d{10}$)/,''); if(d.length!==10){ toast('Check the number','Enter a 10-digit US cell number'); return; } S.obPhone={n:`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`,sent:true,code:smsCode()}; render(); smsNotif(S.obPhone.code); return; }
+  if('phoneResend' in ds){ S.obPhone.code=smsCode(); S.obPhone.typed=''; render(); smsNotif(S.obPhone.code); toast('New code sent'); return; }
+  if('phoneChange' in ds){ S.obPhone={n:(S.obPhone||{}).n}; render(); return; }
+  if('phoneVerify' in ds){ const c=((document.getElementById('obCode')||{}).value||'').replace(/\D/g,''); S.obPhone.typed=c; if(c!==S.obPhone.code){ render(); toast("That code doesn't match",'Check the text or resend'); return; } S.obPhone.ok=true; obStep=4; render(); toast('Number verified'); return; }
   if(ds.ob){ if(ds.ob==='done'){ S.onboarded=true; S.tab='feed'; render(); return; } if(obStep===2){ const n=document.getElementById('obName'); const h=document.getElementById('obHandle'); if(n&&n.value.trim()) S.me.n=n.value.trim(); if(h&&h.value.trim()) S.me.h=h.value.trim(); } obStep=+ds.ob; render(); return; }
   if('contacts' in ds){ if(!S.obContacts){ S.obContacts=true; render(); toast('Contacts matched on device','6 friends found, 3 to invite'); } return; }
   if('photo' in ds){ draft.p=!draft.p||true; $overlay.paint(); return; }
