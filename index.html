@@ -992,7 +992,7 @@ views.onboard = () => {
     <div class="spacer"></div><div class="obfoot"><button class="btn primary wide" data-ob="3">Continue</button>${obDots()}</div></div>`;
   if(obStep===3){
     const diet=S.diet||[];
-    return `<div class="obwrap">${obHdr(2)}<h1>Anything we should keep off your plate?</h1><p>Tap what applies. Friends never see this; it only tunes what we show you.</p>
+    return `<div class="obwrap">${obHdr(2)}<h1>Tell us more about your dietary preferences</h1><p>Tap what applies. Friends never see this; it only tunes what we show you.</p>
       <div class="obscroll"><div class="dietgrid">
         <button class="diet ${diet.length?'':'on'}" data-diet="none">${dietBadge('all')}<span>I eat everything</span></button>
         ${DIETS.map(([k,e,n])=>`<button class="diet ${diet.includes(k)?'on':''}" data-diet="${k}">${dietBadge(k)}<span>${n}</span></button>`).join('')}
