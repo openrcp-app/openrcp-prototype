@@ -393,6 +393,7 @@ a.method{color:inherit;text-decoration:none}
 .deck{position:relative;height:338px;margin:6px 0 0}
 .tcard{position:absolute;left:0;right:0;top:0;background:var(--bg);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.14);overflow:hidden;touch-action:none;user-select:none;cursor:grab;border:1px solid var(--line)}
 .tcard:active{cursor:grabbing}
+.tcard img{-webkit-user-drag:none;user-drag:none;pointer-events:none} /* a draggable photo cancels mouse swipes */
 .tcard .tile{border-radius:0}
 .tcard .tbody{padding:10px 14px 12px}
 .tcard .tbody b{display:block;font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -463,7 +464,7 @@ a.method{color:inherit;text-decoration:none}
     <label class="ctlrow"><input type="checkbox" id="ctlSynth"> Seed feed with 20 synthetic cooks</label>
     <div class="flows">
       <span class="label">Flows to try</span>
-      <div><b>A</b> Restart → sign in → handle → verify phone → what you eat → friends → tick what you cooked → My Kitchen</div>
+      <div><b>A</b> Restart → sign in → handle → verify phone → what you eat → friends → tune your feed (swipe 8) → tick what you cooked → My Kitchen</div>
       <div><b>H</b> Feed → "Tune your feed" card (3rd slot) → swipe 8 → Trending re-ranks</div>
       <div><b>G</b> My Kitchen → Planning to cook → tap a day → tick up to 4 → Made it clears one</div>
       <div><b>B</b> Share from NYT → share sheet → openRCP → Log it → Feed</div>
@@ -946,9 +947,10 @@ views.reader = () => {
 
 /* ---------- Onboarding ---------- */
 let obStep=1;
-// Onboarding after sign-in: 2 handle · 3 phone (required, verified by text) · 4 what you eat · 5 friends · 6 first log. The taste test lives in the feed.
-const OB_LAST=6;
-const obDots = () => `<div class="dots">${[2,3,4,5,6].map(i=>`<i class="${i===obStep?'on':''}"></i>`).join('')}</div>`;
+// Onboarding after sign-in: 2 handle · 3 phone (required, verified by text) · 4 what you eat · 5 friends · 6 tune your feed (skippable taste test) · 7 first log.
+// Anyone who skips the taste test still gets the Tune your feed card in the feed until they finish it.
+const OB_LAST=7;
+const obDots = () => `<div class="dots">${[2,3,4,5,6,7].map(i=>`<i class="${i===obStep?'on':''}"></i>`).join('')}</div>`;
 const obHdr = backTo => `<div class="obhdr">${backTo?`<button class="back" data-ob="${backTo}">${ICON.back}Back</button>`:'<span></span>'}<span class="tiny muted">${obStep-1} of ${OB_LAST-1}</span></div>`;
 // Dietary restrictions: tap what applies. Each carries the keywords it rules out, so the feed and the taste deck respect it immediately.
 const DIETS=[['vegetarian','🥦','Vegetarian',['chicken','seafood','fish','shrimp','roast']],['vegan','🌱','Vegan',['chicken','seafood','fish','shrimp','roast','pizza']],['pescatarian','🐟','Pescatarian',['chicken','roast']],['glutenfree','🌾','Gluten-free',['pasta','noodles','pizza']],['dairyfree','🥛','Dairy-free',[]],['nuts','🥜','Nut allergy',[]],['shellfish','🦐','No shellfish',['shrimp','seafood']],['pork','🐖','No pork',[]],['halal','🕌','Halal',[]],['kosher','✡️','Kosher',['shrimp','seafood']],['lowcarb','🥩','Low-carb',['pasta','noodles','pizza','rice','potatoes']]];
@@ -1030,8 +1032,14 @@ views.onboard = () => {
       </div>
       <div class="obfoot"><button class="btn primary wide" data-ob="6">${nf?`Continue · following ${nf}`:'Skip for now'}</button>${obDots()}</div></div>`;
   }
+  if(obStep===6){
+    const done=tasteDone();
+    return `<div class="obwrap">${obHdr(5)}<h1>Tune your feed</h1><p>${done?'Done. Trending is ranked with this in mind.':`Swipe right on anything you'd actually cook. ${tasteDeck().length} recipes, about 20 seconds.`}</p>
+      ${done?`<div class="empty" style="padding-top:18px">${tasteResult()}<button class="link" data-taste-reset style="margin-top:6px">Do it again</button></div><div class="spacer"></div>`:`${tasteDeckHtml()}<div class="spacer"></div>`}
+      <div class="obfoot">${done?`<button class="btn primary wide" data-ob="7">Continue</button>`:`<button class="skip" data-ob="7">Skip for now</button>`}${obDots()}</div></div>`;
+  }
   const src=S.obSrc||'all';
-  return `<div class="obwrap">${obHdr(5)}<h1>Log something you cooked this week</h1><p>Pick a source, search, tick everything you made.</p>
+  return `<div class="obwrap">${obHdr(6)}<h1>Log something you cooked this week</h1><p>Pick a source, search, tick everything you made.</p>
     ${srcChips(src,'obsrc')}
     <label class="search" style="margin-top:8px">${ICON.search}<input id="obSearch" placeholder="${src==='all'?'Search any recipe':'Search '+esc(srcLabel(src))}" autocomplete="off"></label>
     <div class="obscroll" id="obResults">${obRows()}</div>
@@ -1045,6 +1053,7 @@ function render(){
   if(!S.stack.length) histDepth=0;
   $views.innerHTML = views[v]();
   $views.scrollTop = 0;
+  if(v==='onboard'&&obStep===6) bindDeck();
   if(!(v==='onboard'&&obStep===3&&S.obPhone&&S.obPhone.sent&&!S.obPhone.ok)) document.querySelectorAll('#phone .push.sms').forEach(e=>e.remove());
   $tabbar.hidden = !S.onboarded;
   $tabbar.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', !S.stack.length && b.dataset.tab===S.tab));
@@ -1220,15 +1229,20 @@ function demoSheet(kind){
   const coach=demo.querySelector('.coach'); if(coach){ coach.style.bottom='18px'; coach.style.zIndex='27'; coach.innerHTML=`<b>2</b><span>openRCP shows up like any other app. Pick it, or the "I made it" action.</span><button data-close>Cancel</button>`; }
 }
 /* ---------- Taste test: a card in the feed, a sheet when started ---------- */
+const tasteCardHtml=(r,k)=>`<div class="tcard" data-tcard="${r.id}" style="z-index:${10-k};transform:translateY(${k*6}px) scale(${1-k*.03})">${tile(r,{cls:'wide'})}<div class="tbody"><b>${esc(r.t)}</b><span>${esc(SRC(r).name)}${SRC(r).type!=='cookbook'?' · '+mins(r.m):''}</span></div><span class="stamp yes">Cook it</span><span class="stamp no">Pass</span></div>`;
+// Shared by the feed sheet and the onboarding step: the results summary, and the deck with its Pass / Cook it buttons.
+function tasteResult(){ const liked=(S.taste||[]).length, keys=tasteKeys();
+  return `<div class="avstack" style="justify-content:center">${(S.taste||[]).slice(0,5).map(id=>`<span class="avatar" style="padding:0;overflow:hidden;border:2px solid var(--bg)">${tile(R(id),{cls:'sm'}).replace('class="tile sm"','class="tile sm" style="width:34px;height:34px;border-radius:50%"')}</span>`).join('')}</div>
+    <h3>${liked?`You lean ${esc(keys.slice(0,3).join(', '))}`:'Nothing caught your eye'}</h3><p>${liked?`${liked} ${liked===1?'recipe':'recipes'} you'd cook. Trending is ranked with this in mind from now on.`:'No problem. We learn from what you log.'}</p>`; }
+function tasteDeckHtml(){ const deck=tasteDeck(), i=S.tasteIdx||0;
+  return `<div class="deck" id="deck">${deck.slice(i,i+3).map((r,k)=>tasteCardHtml(r,k)).reverse().join('')}</div>
+    <div class="tbtns"><button class="tbtn no" data-taste="no" aria-label="Pass">✕</button><span class="tiny muted">${i+1} / ${deck.length}</span><button class="tbtn yes" data-taste="yes" aria-label="Cook it">${ICON.check}</button></div>`; }
 function tasteBody(){
-  const deck=tasteDeck(), i=S.tasteIdx||0, liked=(S.taste||[]).length, done=i>=deck.length, keys=tasteKeys();
-  const card=(r,k)=>`<div class="tcard" data-tcard="${r.id}" style="z-index:${10-k};transform:translateY(${k*6}px) scale(${1-k*.03})">${tile(r,{cls:'wide'})}<div class="tbody"><b>${esc(r.t)}</b><span>${esc(SRC(r).name)}${SRC(r).type!=='cookbook'?' · '+mins(r.m):''}</span></div><span class="stamp yes">Cook it</span><span class="stamp no">Pass</span></div>`;
-  if(done) return `<div class="empty" style="padding-top:30px"><div class="avstack" style="justify-content:center">${(S.taste||[]).slice(0,5).map(id=>`<span class="avatar" style="padding:0;overflow:hidden;border:2px solid var(--bg)">${tile(R(id),{cls:'sm'}).replace('class="tile sm"','class="tile sm" style="width:34px;height:34px;border-radius:50%"')}</span>`).join('')}</div>
-    <h3>${liked?`You lean ${esc(keys.slice(0,3).join(', '))}`:'Nothing caught your eye'}</h3><p>${liked?`${liked} ${liked===1?'recipe':'recipes'} you'd cook. Trending is ranked with this in mind from now on.`:'No problem. We learn from what you log.'}</p>
+  const deck=tasteDeck(), done=(S.tasteIdx||0)>=deck.length;
+  if(done) return `<div class="empty" style="padding-top:30px">${tasteResult()}
     <div class="two" style="width:100%"><button class="btn ghost" data-taste-reset>Do it again</button><button class="btn primary" data-close>Done</button></div></div>`;
   return `<p class="small muted" style="margin:0 0 4px">Swipe right on anything you'd actually cook. ${deck.length} cards.</p>
-    <div class="deck" id="deck">${deck.slice(i,i+3).map((r,k)=>card(r,k)).reverse().join('')}</div>
-    <div class="tbtns"><button class="tbtn no" data-taste="no" aria-label="Pass">✕</button><span class="tiny muted">${i+1} / ${deck.length}</span><button class="tbtn yes" data-taste="yes" aria-label="Cook it">${ICON.check}</button></div>`;
+    ${tasteDeckHtml()}`;
 }
 function openTaste(){
   $overlay.innerHTML=`<div class="scrim" data-close><div class="sheet" style="height:86%"><div class="grab"></div>${sheetHdr('Taste test')}<div class="body" id="tasteBody" style="overflow:hidden"></div></div></div>`;
@@ -1245,14 +1259,14 @@ function tasteCard(){
   </article>`;
 }
 function bindDeck(){
-  const top=document.querySelector('#deck .tcard:last-child'); if(!top) return;
+  const top=document.querySelector('#deck .tcard:last-child'); if(!top||top.dataset.bound) return; top.dataset.bound='1';
   let sx=0, dx=0, dragging=false;
   top.addEventListener('pointerdown',e=>{ dragging=true; sx=e.clientX; dx=0; top.setPointerCapture(e.pointerId); top.style.transition='none'; });
   top.addEventListener('pointermove',e=>{ if(!dragging) return; dx=e.clientX-sx; top.style.transform=`translateX(${dx}px) rotate(${dx/18}deg)`; top.style.setProperty('--yes',Math.max(0,Math.min(1,dx/80))); top.style.setProperty('--no',Math.max(0,Math.min(1,-dx/80))); });
   const end=()=>{ if(!dragging) return; dragging=false; if(Math.abs(dx)>90) fling(top,dx>0?'yes':'no'); else { top.style.transition='transform .2s'; top.style.transform=''; top.style.setProperty('--yes',0); top.style.setProperty('--no',0); } };
   top.addEventListener('pointerup',end); top.addEventListener('pointercancel',end);
 }
-function fling(card,ans){ card.style.transition='transform .25s ease-in, opacity .25s'; card.style.setProperty(ans==='yes'?'--yes':'--no',1); card.style.transform=`translateX(${ans==='yes'?520:-520}px) rotate(${ans==='yes'?25:-25}deg)`; card.style.opacity='0'; setTimeout(()=>tasteAnswer(ans),230); }
+function fling(card,ans){ if(card.dataset.flung) return; card.dataset.flung='1'; card.style.transition='transform .25s ease-in, opacity .25s'; card.style.setProperty(ans==='yes'?'--yes':'--no',1); card.style.transform=`translateX(${ans==='yes'?520:-520}px) rotate(${ans==='yes'?25:-25}deg)`; card.style.opacity='0'; setTimeout(()=>tasteAnswer(ans),230); }
 function tasteAnswer(ans){ const deck=tasteDeck(), i=S.tasteIdx||0, r=deck[i]; if(!r) return; if(ans==='yes'){ S.taste=S.taste||[]; if(!S.taste.includes(r.id)) S.taste.push(r.id); } S.tasteIdx=i+1; if(document.getElementById('tasteBody')&&$overlay.paint) $overlay.paint(); else render(); if(S.tasteIdx>=deck.length) render(); }
 /* ---------- Planning to cook ---------- */
 function openPlan(rid){
