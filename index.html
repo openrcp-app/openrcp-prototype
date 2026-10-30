@@ -270,6 +270,7 @@ h1,h2,h3{margin:0;font-weight:500;text-wrap:balance}
 .obhdr .back{display:flex;align-items:center;gap:2px;color:var(--muted);font-size:14px;margin-left:-6px}
 .obscroll{flex:1;min-height:0;overflow-y:auto;margin:0 -22px;padding:0 22px}
 .obfoot{display:flex;flex-direction:column;gap:8px;margin:0 -22px;padding:12px 22px calc(16px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
+.push.sms{top:56px} /* below the Back row so Back stays tappable while the code banner is up */
 .phrow{display:flex;gap:8px;align-items:center}
 .phrow .cc{background:var(--cream);border-radius:10px;padding:11px 13px;font-size:15px;color:var(--muted)}
 .codefield{font-size:24px;letter-spacing:.35em;text-align:center;font-variant-numeric:tabular-nums}
@@ -1044,6 +1045,7 @@ function render(){
   if(!S.stack.length) histDepth=0;
   $views.innerHTML = views[v]();
   $views.scrollTop = 0;
+  if(!(v==='onboard'&&obStep===3&&S.obPhone&&S.obPhone.sent&&!S.obPhone.ok)) document.querySelectorAll('#phone .push.sms').forEach(e=>e.remove());
   $tabbar.hidden = !S.onboarded;
   $tabbar.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', !S.stack.length && b.dataset.tab===S.tab));
   const ex = document.getElementById('exploreSearch'); if(ex){ ex.addEventListener('input',()=>{ S.exploreQ=ex.value; S.explorePage=0; const l=document.getElementById('trendList'); if(l) l.innerHTML=trendBatch(0); const h=document.getElementById('trendHead'); if(h) h.textContent=ex.value.trim()?`“${ex.value.trim()}”`:'Trending now'; }); }
@@ -1316,13 +1318,14 @@ function logIt(){
   toast('Logged', n===1?"First time you've made this":`That's your ${n}${n===2?'nd':n===3?'rd':'th'} time`);
 }
 function smsCode(){ return String(Math.floor(100000+Math.random()*900000)); }
-// Simulated incoming text. Tapping it fills the code, like the iOS/Android one-time-code autofill.
+// Simulated incoming text. It stays until tapped (fills the code, like iOS/Android one-time-code autofill)
+// or until the code step is left or verified; render() clears it then.
 function smsNotif(code){
   document.querySelectorAll('#phone .push.sms').forEach(e=>e.remove());
   const el=document.createElement('button'); el.className='push sms';
   el.innerHTML=`<span class="ic">${ICON.logo}</span><span><b>Messages</b><span>Your openRCP code is ${code}</span></span><small>now</small>`;
   el.addEventListener('click',()=>{ el.remove(); const f=document.getElementById('obCode'); if(f){ f.value=code; S.obPhone.typed=code; } });
-  document.getElementById('phone').appendChild(el); setTimeout(()=>{ if(el.isConnected) el.remove(); },8000);
+  document.getElementById('phone').appendChild(el);
 }
 function pushNotif(){
   const week = friendCooks().filter(c=>now-c.t<7*DAY).length;
@@ -1414,7 +1417,8 @@ document.getElementById('ctlSynth').addEventListener('change',e=>setSynth(e.targ
 document.getElementById('ctlDigest').addEventListener('click',()=>{ if(!S.onboarded){S.onboarded=true;render();} pushNotif(); });
 document.getElementById('ctlOnboard').addEventListener('click',()=>{ obStep=1; freshState(false); S.cooks=S.cooks.filter(c=>c.u!=='me'); render(); });
 document.getElementById('ctlReset').addEventListener('click',()=>{ freshState(true); render(); toast('Reset'); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeOverlay(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeOverlay();
+  if(e.key==='Enter'&&(e.target.id==='obPhone'||e.target.id==='obCode')){ e.preventDefault(); document.querySelector(e.target.id==='obPhone'?'[data-phone-send]':'[data-phone-verify]')?.click(); } });
 
 /* ---------- Boot ---------- */
 const startOnboarding = location.hash==='#onboarding';
